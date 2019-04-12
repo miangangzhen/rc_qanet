@@ -1,0 +1,3 @@
+python run.py --prepare
+
+python run.py --train --algo BIDAF --epochs 10
