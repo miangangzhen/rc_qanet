@@ -5,10 +5,9 @@ import os
 import time
 import logging
 import json
-import numpy as np
 
 import tensorflow as tf
-from my_code.qanet_layers import initializer, regularizer, residual_block, highway, conv, mask_logits, trilinear, total_params, \
+from my_code.qanet_layers import regularizer, residual_block, highway, conv, mask_logits, trilinear, total_params, \
     position_embedding
 from my_code.qanet_optimizer import AdamWOptimizer
 from tensorflow.python.ops import array_ops
