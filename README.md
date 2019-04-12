@@ -2,5 +2,4 @@
 modify version of dureader and qanet
 
 run training:
-cd tensorflow
-python run.py --train
+python tensorflow/run.py --train
