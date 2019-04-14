@@ -139,7 +139,9 @@ class BRCDataset(object):
                         for para_info in para_infos[:1]:
                             fake_passage_tokens += para_info[0]
                         data['passages'].append({'passage_tokens': fake_passage_tokens})
+
                 data_set.append(data)
+            print("data from" + data_path)
             print("total data: {}, use data: {}".format(lidx+1, len(data_set)))
         return data_set
 

@@ -7,6 +7,8 @@ import logging
 import json
 
 import tensorflow as tf
+from tensorflow.contrib.layers import xavier_initializer
+
 from my_code.qanet_layers import regularizer, residual_block, highway, conv, mask_logits, trilinear, total_params, \
     position_embedding
 from my_code.qanet_optimizer import AdamWOptimizer
@@ -50,7 +52,7 @@ class QANET_Model(object):
 
         # session info
         sess_config = tf.ConfigProto()
-        sess_config.gpu_options.allow_growth = False
+        sess_config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=sess_config)
 
         self._build_graph()
@@ -121,9 +123,10 @@ class QANET_Model(object):
             self.pretrained_word_mat = tf.get_variable("word_emb_mat",
                                                        [self.vocab.size() - 2, self.vocab.embed_dim],
                                                        dtype=tf.float32,
+                                                       # initializer=xavier_initializer(),
                                                        initializer=tf.constant_initializer(
-                                                           self.vocab.embeddings[2:],
-                                                           dtype=tf.float32),
+                                                          self.vocab.embeddings[2:],
+                                                          dtype=tf.float32),
                                                        trainable=False)
             self.word_pad_unk_mat = tf.get_variable("word_unk_pad",
                                                     [2, self.pretrained_word_mat.get_shape()[1]],
@@ -151,7 +154,7 @@ class QANET_Model(object):
         with tf.variable_scope("Embedding_Encoder_Layer"):
             self.c_embed_encoding = residual_block(self.c_emb,
                                                    num_blocks=1,
-                                                   num_conv_layers=2,
+                                                   num_conv_layers=4, #  2,
                                                    kernel_size=7,
                                                    mask=self.c_mask,
                                                    num_filters=d,
@@ -162,7 +165,7 @@ class QANET_Model(object):
                                                    dropout=self.dropout)
             self.q_embed_encoding = residual_block(self.q_emb,
                                                    num_blocks=1,
-                                                   num_conv_layers=2,
+                                                   num_conv_layers=4, #  2,
                                                    kernel_size=7,
                                                    mask=self.q_mask,
                                                    num_filters=d,
@@ -199,7 +202,7 @@ class QANET_Model(object):
                     self.enc[i] = tf.nn.dropout(self.enc[i], 1.0 - self.dropout)
                 self.enc.append(
                     residual_block(self.enc[i],
-                                   num_blocks=1,
+                                   num_blocks=7, #  1,
                                    num_conv_layers=2,
                                    kernel_size=5,
                                    mask=self.c_mask,
@@ -233,16 +236,21 @@ class QANET_Model(object):
             end_logits = tf.squeeze(
                 conv(tf.concat([self.enc[1], self.enc[3]], axis=-1), 1, bias=False, name="end_pointer"), -1)
 
-        self.logits = [mask_logits(start_logits, mask=tf.reshape(self.c_mask, [N, -1])),
+        # self.logits = [mask_logits(start_logits, mask=tf.reshape(self.c_mask, [N, -1])),
+        #                mask_logits(end_logits, mask=tf.reshape(self.c_mask, [N, -1]))]
+
+        start_logits, end_logits =  [mask_logits(start_logits, mask=tf.reshape(self.c_mask, [N, -1])),
                        mask_logits(end_logits, mask=tf.reshape(self.c_mask, [N, -1]))]
 
         # self.logits = [mask_logits(start_logits, mask=self.c_mask),
         #                mask_logits(end_logits, mask=self.c_mask)]
 
-        self.logits1, self.logits2 = [l for l in self.logits]
+        # self.logits1, self.logits2 = [l for l in self.logits]
+        self.logits1, self.logits2 = [tf.nn.softmax(start_logits), tf.nn.softmax(end_logits)]
 
-        outer = tf.matmul(tf.expand_dims(tf.nn.softmax(self.logits1), axis=2),
-                          tf.expand_dims(tf.nn.softmax(self.logits2), axis=1))
+        # outer = tf.matmul(tf.expand_dims(tf.nn.softmax(self.logits1), axis=2),
+        #                   tf.expand_dims(tf.nn.softmax(self.logits2), axis=1))
+        outer = tf.matmul(tf.expand_dims(self.logits1, axis=2), tf.expand_dims(self.logits2, axis=1))
 
         outer = tf.matrix_band_part(outer, 0, self.max_a_len)
         self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
@@ -258,18 +266,31 @@ class QANET_Model(object):
                         - (1 - alpha) * (neg_p_sub ** gamma) * tf.log(tf.clip_by_value(1.0 - logits, 1e-8, 1.0))
             return tf.reduce_sum(cross_ent, 1)
 
-        start_label = tf.one_hot(self.start_label, tf.shape(self.logits1)[1], axis=1)
-        end_label = tf.one_hot(self.end_label, tf.shape(self.logits2)[1], axis=1)
+        def sparse_nll_loss(probs, labels, epsilon=1e-9, scope=None):
+            """
+            negative log likelyhood loss
+            """
+            with tf.name_scope(scope, "log_loss"):
+                # labels = tf.one_hot(labels, tf.shape(probs)[1], axis=1)
+                losses = - tf.reduce_sum(labels * tf.log(probs + epsilon), 1)
+            return losses
+
+        self.start_label_onehot = tf.one_hot(self.start_label, tf.shape(self.logits1)[1], axis=1)
+        self.end_label_onehot = tf.one_hot(self.end_label, tf.shape(self.logits2)[1], axis=1)
 
         if self.config.loss_type == 'cross_entropy':
             start_loss = tf.nn.softmax_cross_entropy_with_logits(
-                logits=self.logits1, labels=start_label)
+                logits=self.logits1, labels=self.start_label_onehot)
             end_loss = tf.nn.softmax_cross_entropy_with_logits(
-                logits=self.logits2, labels=end_label)
+                logits=self.logits2, labels=self.end_label_onehot)
+            self.loss = tf.reduce_mean(start_loss + end_loss)
+        elif self.config.loss_type == "sparse_nll_loss":
+            start_loss = sparse_nll_loss(probs=self.logits1, labels=self.start_label_onehot)
+            end_loss = sparse_nll_loss(probs=self.logits2, labels=self.end_label_onehot)
             self.loss = tf.reduce_mean(start_loss + end_loss)
         else:
-            start_loss = focal_loss(tf.nn.softmax(self.logits1, -1), start_label, alpha=0.95, gamma=2)
-            end_loss = focal_loss(tf.nn.softmax(self.logits2, -1), end_label, alpha=0.95, gamma=2)
+            start_loss = focal_loss(tf.nn.softmax(self.logits1, -1), self.start_label_onehot, alpha=0.95, gamma=2)
+            end_loss = focal_loss(tf.nn.softmax(self.logits2, -1), self.end_label_onehot, alpha=0.95, gamma=2)
             self.loss = tf.reduce_mean(start_loss + end_loss)
         self.logger.info("loss type %s" % self.config.loss_type)
 
@@ -287,25 +308,31 @@ class QANET_Model(object):
             with tf.control_dependencies([ema_op]):
                 self.loss = tf.identity(self.loss)
 
-                self.shadow_vars = []
-                self.global_vars = []
+                self.assign_vars = []
                 for var in tf.global_variables():
                     v = self.var_ema.average(var)
                     if v:
-                        self.shadow_vars.append(v)
-                        self.global_vars.append(var)
-                self.assign_vars = []
-                for g, v in zip(self.global_vars, self.shadow_vars):
-                    self.assign_vars.append(tf.assign(g, v))
+                        self.assign_vars.append(tf.assign(var, v))
+
+                # self.shadow_vars = []
+                # self.global_vars = []
+                # for var in tf.global_variables():
+                #     v = self.var_ema.average(var)
+                #     if v:
+                #         self.shadow_vars.append(v)
+                #         self.global_vars.append(var)
+                # self.assign_vars = []
+                # for g, v in zip(self.global_vars, self.shadow_vars):
+                #     self.assign_vars.append(tf.assign(g, v))
 
     def _create_train_op(self):
-        self.lr = tf.minimum(self.learning_rate, self.learning_rate / tf.log(999.) * tf.log(tf.cast(self.global_step, tf.float32) + 1))
-        # self.lr = self.learning_rate
+        # self.lr = tf.minimum(self.learning_rate, self.learning_rate / tf.log(999.) * tf.log(tf.cast(self.global_step, tf.float32) + 1))
+        self.lr = self.learning_rate
 
         if self.optim_type == 'adagrad':
             self.optimizer = tf.train.AdagradOptimizer(self.lr)
         elif self.optim_type == 'adam':
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr, beta1=0.8, epsilon=1e-7)
         elif self.optim_type == 'rprop':
             self.optimizer = tf.train.RMSPropOptimizer(self.lr)
         elif self.optim_type == 'sgd':
@@ -374,7 +401,10 @@ class QANET_Model(object):
                          self.end_label: batch['end_id'],
                          self.dropout: dropout}
 
-            _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
+            # _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
+            _, loss, global_step, start_label, end_label, logit1, logit2 = self.sess.run([self.train_op, self.loss, self.global_step, self.start_label, self.end_label,self.logits1,self.logits2], feed_dict)
+            # print(start_label)
+            # print(logit1)
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
             n_batch_loss += loss
@@ -383,7 +413,7 @@ class QANET_Model(object):
                     bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch))
                 n_batch_loss = 0
                 # save to checkpoint
-                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"))
+                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"), global_step=global_step)
         print("total_num", total_num)
         return 1.0 * total_loss / total_num
 
@@ -392,14 +422,15 @@ class QANET_Model(object):
                 self.max_q_len, self.config.hidden_size, self.config.head_size)
 
     def train(self, data, epochs, batch_size, save_dir, save_prefix,
-              dropout_keep_prob=1.0, evaluate=True):
+              dropout_keep_prob=0.0, evaluate=True):
         pad_id = self.vocab.get_id(self.vocab.pad_token)
         max_rouge_l = 0
+        dropout = (1.*10 - dropout_keep_prob*10)/10
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches_for_qanet('train', batch_size, pad_id, shuffle=True)
             #  data.next_batch('train', batch_size, pad_id, pad_char_id, shuffle=True)
-            train_loss = self._train_epoch(train_batches, 1.0-dropout_keep_prob)
+            train_loss = self._train_epoch(train_batches, dropout)
             self.logger.info('Average train loss for epoch {} is {}'.format(epoch, train_loss))
 
             if evaluate:

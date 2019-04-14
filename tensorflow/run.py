@@ -76,7 +76,7 @@ def parse_args():
                                 help='size of LSTM hidden units')
     model_settings.add_argument('--max_p_num', type=int, default=5,
                                 help='max passage num in one sample')
-    model_settings.add_argument('--max_p_len', type=int, default=300, #  500,
+    model_settings.add_argument('--max_p_len', type=int, default=500,
                                 help='max length of passage')
     model_settings.add_argument('--max_q_len', type=int, default=20, #  60,
                                 help='max length of question')
@@ -85,7 +85,7 @@ def parse_args():
 
     path_settings = parser.add_argument_group('path settings')
     path_settings.add_argument('--train_files', nargs='+',
-                               default=["../data/train_preprocessed/trainset/search.train.json"], #  ['../data/demo/trainset/search.train.json'],
+                               default=["../data/train_preprocessed/trainset/search.train.jsoncleaned"], #  ['../data/demo/trainset/search.train.json'],
                                help='list of files that contain the preprocessed train data')
     path_settings.add_argument('--dev_files', nargs='+',
                                default=["../data/dev_preprocessed/devset/search.dev.json", "../data/dev_preprocessed/devset/zhidao.dev.json"], #  ['../data/demo/devset/search.dev.json'],
@@ -97,9 +97,9 @@ def parse_args():
                                help='the dir with preprocessed baidu reading comprehension data')
     path_settings.add_argument('--vocab_dir', default='resource/vocab/',
                                help='the dir to save vocabulary')
-    path_settings.add_argument('--model_dir', default='../data/models/',
+    path_settings.add_argument('--model_dir', default='models/',
                                help='the dir to store models')
-    path_settings.add_argument("--checkpoint_dir", default="../data/checkpoint/")
+    path_settings.add_argument("--checkpoint_dir", default="checkpoint/")
     path_settings.add_argument('--result_dir', default='../data/results/',
                                help='the dir to output the results')
     path_settings.add_argument('--summary_dir', default='../data/summary/',
@@ -165,23 +165,37 @@ def train(args):
     """
     trains the reading comprehension model
     """
+    # 通用
+    # 数据增强后，max_p_num 5 => 2
+    args.max_p_num = 2
+    # args.l2_norm = None
+    # args.loss_type = "cross_entropy"
+    # args.loss_type = "sparse_nll_loss"
+    args.optim = "adam"
+    args.dropout_keep_prob = 0.9
+
     # run on gpu
-    # args.batch_size = 24
-    # args.hidden_size = 96
+    args.batch_size = 8
+    args.hidden_size = 96
+    args.head_size = 2
+    # args.use_position_attn = True
+    args.decay = 0.9
+    limit=20000
 
     # run on cpu
-    args.batch_size = 4
-    args.hidden_size = 32
-    args.max_p_len = 100
-    args.max_q_len = 10
-    args.loss_type = "cross_entropy"
+    # args.batch_size = 4
+    # args.hidden_size = 32
+    # args.max_p_len = 100
+    # args.max_q_len = 10
+    # args.loss_type = "cross_entropy"
+    # limit=10000
 
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
     with open(os.path.join(args.vocab_dir, 'vocab.data'), 'rb') as fin:
         vocab = pickle.load(fin)
     brc_data = BRCDataset(args.max_p_num, args.max_p_len, args.max_q_len,
-                          args.train_files, args.dev_files, limit=1000)
+                          args.train_files, args.dev_files, limit=limit)
     logger.info('Converting text into ids...')
     brc_data.convert_to_ids(vocab)
     logger.info('Initialize the model...')
@@ -282,4 +296,5 @@ def run():
         predict(args)
 
 if __name__ == '__main__':
+    tf.logging.set_verbosity("INFO")
     run()
