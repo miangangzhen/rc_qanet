@@ -221,10 +221,9 @@ class QANET_Model(object):
             end_logits = tf.squeeze(
                 conv(tf.concat([self.enc[1], self.enc[3]], axis=-1), 1, bias=False, name="end_pointer"), -1)
 
-        start_logits, end_logits =  [mask_logits(start_logits, mask=tf.reshape(self.c_mask, [N, -1])),
-                       mask_logits(end_logits, mask=tf.reshape(self.c_mask, [N, -1]))]
-
-        self.logits1, self.logits2 = start_logits, end_logits
+        reshaped_mask = tf.reshape(self.c_mask, [N, -1])
+        self.logits1, self.logits2 =  [mask_logits(start_logits, mask=reshaped_mask),
+                       mask_logits(end_logits, mask=reshaped_mask)]
 
         outer = tf.matmul(tf.expand_dims(self.logits1, axis=2), tf.expand_dims(self.logits2, axis=1))
 
