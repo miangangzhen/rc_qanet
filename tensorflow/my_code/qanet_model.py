@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
-
-
 import os
 import time
 import logging
 import json
-
 import tensorflow as tf
-from tensorflow.contrib.layers import xavier_initializer
-
 from my_code.qanet_layers import regularizer, residual_block, highway, conv, mask_logits, trilinear, total_params, \
     position_embedding
 from my_code.qanet_optimizer import AdamWOptimizer
 from tensorflow.python.ops import array_ops
-
 from utils.dureader_eval import compute_bleu_rouge
 from utils.dureader_eval import normalize
 
@@ -85,13 +79,8 @@ class QANET_Model(object):
     """
     :description: Placeholders
     """
-
     def _setup_placeholders(self):
 
-        # self.c = tf.placeholder(tf.int32, [self.config.batch_size * self.max_p_num, self.config.max_p_len],
-        #                         "context")
-        # self.q = tf.placeholder(tf.int32, [self.config.batch_size * self.max_p_num, self.config.max_q_len],
-        #                         "question")
         self.c = tf.placeholder(tf.int32, [None, None],
                                 "context")
         self.q = tf.placeholder(tf.int32, [None, None],
@@ -111,7 +100,8 @@ class QANET_Model(object):
         self.q_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)
         self.dropout = tf.placeholder(tf.float32, name="dropout")
 
-        self.global_step = tf.Variable(0, name="global_step", trainable=False)
+        self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
+                                           initializer=tf.constant_initializer(0), trainable=False)
 
     """
     :descrition: The embedding layer, question and passage share embeddings
@@ -123,7 +113,6 @@ class QANET_Model(object):
             self.pretrained_word_mat = tf.get_variable("word_emb_mat",
                                                        [self.vocab.size() - 2, self.vocab.embed_dim],
                                                        dtype=tf.float32,
-                                                       # initializer=xavier_initializer(),
                                                        initializer=tf.constant_initializer(
                                                           self.vocab.embeddings[2:],
                                                           dtype=tf.float32),
@@ -149,8 +138,6 @@ class QANET_Model(object):
 
     def _encode(self):
         N, PL, QL, d, nh = self._params()
-        # if self.config.fix_pretrained_vector:
-        #     dc = self.char_mat.get_shape()[-1]
         with tf.variable_scope("Embedding_Encoder_Layer"):
             self.c_embed_encoding = residual_block(self.c_emb,
                                                    num_blocks=1,
@@ -192,8 +179,6 @@ class QANET_Model(object):
                                       self.c_embed_encoding * self.q2c]
 
             N, PL, QL, d, nh = self._params()
-        # if self.config.fix_pretrained_vector:
-        #     dc = self.char_mat.get_shape()[-1]
         with tf.variable_scope("Model_Encoder_Layer"):
             inputs = tf.concat(self.attention_outputs, axis=-1)
             self.enc = [conv(inputs, d, name="input_projection")]
@@ -236,20 +221,11 @@ class QANET_Model(object):
             end_logits = tf.squeeze(
                 conv(tf.concat([self.enc[1], self.enc[3]], axis=-1), 1, bias=False, name="end_pointer"), -1)
 
-        # self.logits = [mask_logits(start_logits, mask=tf.reshape(self.c_mask, [N, -1])),
-        #                mask_logits(end_logits, mask=tf.reshape(self.c_mask, [N, -1]))]
-
         start_logits, end_logits =  [mask_logits(start_logits, mask=tf.reshape(self.c_mask, [N, -1])),
                        mask_logits(end_logits, mask=tf.reshape(self.c_mask, [N, -1]))]
 
-        # self.logits = [mask_logits(start_logits, mask=self.c_mask),
-        #                mask_logits(end_logits, mask=self.c_mask)]
+        self.logits1, self.logits2 = start_logits, end_logits
 
-        # self.logits1, self.logits2 = [l for l in self.logits]
-        self.logits1, self.logits2 = [tf.nn.softmax(start_logits), tf.nn.softmax(end_logits)]
-
-        # outer = tf.matmul(tf.expand_dims(tf.nn.softmax(self.logits1), axis=2),
-        #                   tf.expand_dims(tf.nn.softmax(self.logits2), axis=1))
         outer = tf.matmul(tf.expand_dims(self.logits1, axis=2), tf.expand_dims(self.logits2, axis=1))
 
         outer = tf.matrix_band_part(outer, 0, self.max_a_len)
@@ -271,7 +247,6 @@ class QANET_Model(object):
             negative log likelyhood loss
             """
             with tf.name_scope(scope, "log_loss"):
-                # labels = tf.one_hot(labels, tf.shape(probs)[1], axis=1)
                 losses = - tf.reduce_sum(labels * tf.log(probs + epsilon), 1)
             return losses
 
@@ -294,8 +269,6 @@ class QANET_Model(object):
             self.loss = tf.reduce_mean(start_loss + end_loss)
         self.logger.info("loss type %s" % self.config.loss_type)
 
-        self.all_params = tf.trainable_variables()
-
         if self.config.l2_norm is not None:
             self.logger.info("applying l2 loss")
             variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
@@ -314,20 +287,10 @@ class QANET_Model(object):
                     if v:
                         self.assign_vars.append(tf.assign(var, v))
 
-                # self.shadow_vars = []
-                # self.global_vars = []
-                # for var in tf.global_variables():
-                #     v = self.var_ema.average(var)
-                #     if v:
-                #         self.shadow_vars.append(v)
-                #         self.global_vars.append(var)
-                # self.assign_vars = []
-                # for g, v in zip(self.global_vars, self.shadow_vars):
-                #     self.assign_vars.append(tf.assign(g, v))
 
     def _create_train_op(self):
-        # self.lr = tf.minimum(self.learning_rate, self.learning_rate / tf.log(999.) * tf.log(tf.cast(self.global_step, tf.float32) + 1))
-        self.lr = self.learning_rate
+        self.lr = tf.minimum(self.learning_rate, self.learning_rate / tf.log(999.) * tf.log(tf.cast(self.global_step, tf.float32) + 1))
+        # self.lr = self.learning_rate
 
         if self.optim_type == 'adagrad':
             self.optimizer = tf.train.AdagradOptimizer(self.lr)
@@ -344,14 +307,14 @@ class QANET_Model(object):
             raise NotImplementedError('Unsupported optimizer: {}'.format(self.optim_type))
 
         self.logger.info("applying optimize %s" % self.optim_type)
-        trainable_vars = tf.trainable_variables()
+
         if self.config.clip_weight:
-            # clip_weight
-            tvars = tf.trainable_variables()
-            grads = tf.gradients(self.loss, tvars)
-            grads, _ = tf.clip_by_global_norm(grads, clip_norm=self.config.max_norm_grad)
-            grad_var_pairs = zip(grads, tvars)
-            self.train_op = self.optimizer.apply_gradients(grad_var_pairs, name='apply_grad')
+            grads = self.optimizer.compute_gradients(self.loss)
+            gradients, variables = zip(*grads)
+            capped_grads, _ = tf.clip_by_global_norm(
+                gradients, self.config.max_norm_grad)
+            self.train_op = self.optimizer.apply_gradients(
+                zip(capped_grads, variables), global_step=self.global_step)
         else:
             self.train_op = self.optimizer.minimize(self.loss)
 
@@ -360,19 +323,13 @@ class QANET_Model(object):
             W = tf.get_variable(name="attn_W",
                                 shape=[2 * self.config.hidden_size, 2 * self.config.hidden_size],
                                 initializer=tf.contrib.layers.xavier_initializer(),
-                                # initializer=tf.truncated_normal_initializer(),
-                                # initializer=tf.keras.initializers.lecun_normal(),
                                 dtype=tf.float32)
             V = tf.get_variable(name="attn_V", shape=[2 * self.config.hidden_size, 1],
                                 initializer=tf.contrib.layers.xavier_initializer(),
-                                # initializer=tf.truncated_normal_initializer(),
-                                # initializer=tf.keras.initializers.lecun_normal(),
                                 dtype=tf.float32)
             U = tf.get_variable(name="attn_U",
                                 shape=[2 * self.config.hidden_size, 2 * self.config.hidden_size],
                                 initializer=tf.contrib.layers.xavier_initializer(),
-                                # initializer=tf.truncated_normal_initializer(),
-                                # initializer=tf.keras.initializers.lecun_normal(),
                                 dtype=tf.float32)
 
             self.position_emb = tf.reshape(self.position_emb, [-1, 2 * self.config.hidden_size])
@@ -395,16 +352,11 @@ class QANET_Model(object):
         for bitx, batch in enumerate(train_batches, 1):
             feed_dict = {self.c: batch['passage_token_ids'],
                          self.q: batch['question_token_ids'],
-                         # self.qh: batch['question_char_ids'],
-                         # self.ch: batch["passage_char_ids"],
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
                          self.dropout: dropout}
 
-            # _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
-            _, loss, global_step, start_label, end_label, logit1, logit2 = self.sess.run([self.train_op, self.loss, self.global_step, self.start_label, self.end_label,self.logits1,self.logits2], feed_dict)
-            # print(start_label)
-            # print(logit1)
+            _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
             n_batch_loss += loss
@@ -429,7 +381,6 @@ class QANET_Model(object):
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches_for_qanet('train', batch_size, pad_id, shuffle=True)
-            #  data.next_batch('train', batch_size, pad_id, pad_char_id, shuffle=True)
             train_loss = self._train_epoch(train_batches, dropout)
             self.logger.info('Average train loss for epoch {} is {}'.format(epoch, train_loss))
 
@@ -437,7 +388,6 @@ class QANET_Model(object):
                 self.logger.info('Evaluating the model after epoch {}'.format(epoch))
                 if data.dev_set is not None:
                     eval_batches = data.gen_mini_batches_for_qanet('dev', batch_size, pad_id, shuffle=False)
-                    #  data.next_batch('dev', batch_size, pad_id, pad_char_id, shuffle=False)
                     eval_loss, bleu_rouge = self.evaluate(eval_batches)
                     self.logger.info('Dev eval loss {}'.format(eval_loss))
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
