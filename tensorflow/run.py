@@ -168,27 +168,25 @@ def train(args):
     # 通用
     # 数据增强后，max_p_num 5 => 2
     args.max_p_num = 2
-    # args.l2_norm = None
     args.loss_type = "cross_entropy"
-    # args.loss_type = "sparse_nll_loss"
     args.optim = "adam"
     args.dropout_keep_prob = 0.9
 
     # run on gpu
-    args.batch_size = 8
+    # args.batch_size = 8
+    # args.hidden_size = 96
+    # args.head_size = 1
+    # limit=None
+    # args.max_p_len = 450
+
+    # run on colab
+    args.batch_size = 32
     args.hidden_size = 96
     args.head_size = 1
-    # args.use_position_attn = True
-    limit=None
-    args.max_p_len = 450
-
-    # run on cpu
-    # args.batch_size = 4
-    # args.hidden_size = 32
-    # args.max_p_len = 100
-    # args.max_q_len = 10
-    # args.loss_type = "cross_entropy"
-    # limit=10000
+    limit = None
+    args.max_p_len = 500
+    args.decay = 0.9999
+    args.use_position_attn = True
 
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
