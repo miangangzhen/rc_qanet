@@ -347,7 +347,7 @@ class QANET_Model(object):
 
     def _train_epoch(self, train_batches, dropout):
         total_num, total_loss = 0, 0
-        log_every_n_batch, n_batch_loss = 50, 0
+        log_every_n_batch, n_batch_loss = 500, 0
         for bitx, batch in enumerate(train_batches, 1):
             feed_dict = {self.c: batch['passage_token_ids'],
                          self.q: batch['question_token_ids'],
