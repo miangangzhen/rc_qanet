@@ -261,9 +261,9 @@ def conv(inputs, output_size, bias=None, activation=None, kernel_size=1, name="c
             return outputs
 
 
-def mask_logits(inputs, mask, mask_value=-1e25, scale=2*96):
+def mask_logits(inputs, mask, mask_value=-1e25, scale=96):
     mask = tf.cast(mask, tf.float32)
-    inputs *= scale
+    inputs *= 1/math.sqrt(2*scale)
     return inputs * mask + mask_value * (1 - mask)
 
 
