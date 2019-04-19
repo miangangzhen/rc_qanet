@@ -86,6 +86,7 @@ class QANET_Model(object):
         self.q = tf.placeholder(tf.int32, [None, None],
                                 "question")
 
+        # self.c shape [batch_size * 2, max_p_len]
         self.c = tf.reshape(self.c, [-1, self.config.max_p_len])
         self.q = tf.reshape(self.q, [-1, self.config.max_q_len])
 
@@ -166,6 +167,10 @@ class QANET_Model(object):
     def _fuse(self):
 
         with tf.variable_scope("Context_to_Query_Attention_Layer"):
+            # self.c_embed_encoding shape [batch_size * 2, c_len, hidden]
+            # self.q_embed_encoding shape [batch_size * 2, q_len, hidden]
+            # C shape [batch_size * 2, c_len, 2*q_len, hidden_size]
+            # Q shape [batch_size * 2, c_len, 2*q_len, hidden_size]
             C = tf.tile(tf.expand_dims(self.c_embed_encoding, 2), [1, 1, self.max_q_len, 1])
             Q = tf.tile(tf.expand_dims(self.q_embed_encoding, 1), [1, self.max_p_len, 1, 1])
             S = trilinear([C, Q, C * Q], input_keep_prob=1.0 - self.dropout)
@@ -515,9 +520,13 @@ class QANET_Model(object):
         self.saver.save(self.sess, os.path.join(model_dir, model_prefix))
         self.logger.info('Model saved in {}, with prefix {}.'.format(model_dir, model_prefix))
 
-    def restore(self, model_dir, model_prefix):
+    def restore(self, model_dir, model_prefix=None):
         """
         Restores the model into model_dir from model_prefix as the model indicator
         """
-        self.saver.restore(self.sess, os.path.join(model_dir, model_prefix))
-        self.logger.info('Model restored from {}, with prefix {}'.format(model_dir, model_prefix))
+        if model_prefix is None:
+            path = tf.train.latest_checkpoint(model_dir)
+        else:
+            path = os.path.join(model_dir, model_prefix)
+        self.saver.restore(self.sess, path)
+        self.logger.info('Model restored from {}'.format(path))

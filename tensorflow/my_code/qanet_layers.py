@@ -118,13 +118,19 @@ def highway(x, size=None, activation=tf.nn.relu,
         if size is None:
             size = x.shape.as_list()[-1]
         else:
+            # shape [batch_size, sequence_length, hidden_size]
             x = conv(x, size, name="input_projection", reuse=reuse)
         for i in range(num_layers):
+            # 这里用了sigmoid激活函数，因此值都介于[0, 1]，相当于是个gate
+            # shape [batch_size, sequence_length, hidden_size]
             T = conv(x, size, bias=True, activation=tf.sigmoid,
                      name="gate_%d" % i, reuse=reuse)
+            # 隐藏层
+            # shape [batch_size, sequence_length, hidden_size]
             H = conv(x, size, bias=True, activation=activation,
                      name="activation_%d" % i, reuse=reuse)
             H = tf.nn.dropout(H, 1.0 - dropout)
+            # 通过gate来权衡输入x与隐藏层H
             x = H * T + x * (1.0 - T)
         return x
 
@@ -139,13 +145,17 @@ def residual_block(inputs, num_blocks, num_conv_layers, kernel_size, mask=None,
                    seq_len=None, scope="res_block", is_training=True,
                    reuse=None, bias=True, dropout=0.0):
     with tf.variable_scope(scope, reuse=reuse):
+        # inputs shape [batch_size, sequence_length, hidden_size]
         if input_projection:
+            # projection layer
             inputs = conv(inputs, num_filters, name="input_projection", reuse=reuse)
         outputs = inputs
         sublayer = 1
         total_sublayers = (num_conv_layers + 2) * num_blocks
         for i in range(num_blocks):
+            # add position embedding
             outputs = add_timing_signal_1d(outputs)
+            # default parameter: num_conv_layers=4, kernel_size=7, num_filters=96
             outputs, sublayer = conv_block(outputs, num_conv_layers, kernel_size, num_filters,
                                            seq_len=seq_len, scope="encoder_block_%d" % i, reuse=reuse, bias=bias,
                                            dropout=dropout, sublayers=(sublayer, total_sublayers))
@@ -421,7 +431,8 @@ def get_timing_signal_1d(length, channels, min_timescale=1.0, max_timescale=1.0e
     Returns:
     a Tensor of timing signals [1, length, channels]
     """
-    position = tf.to_float(tf.range(length))
+    # position = tf.to_float(tf.range(length))
+    position = tf.range(length, dtype=tf.float32)
     num_timescales = channels // 2
     log_timescale_increment = (
             math.log(float(max_timescale) / float(min_timescale)) /
@@ -443,6 +454,8 @@ def trilinear(args,
               input_keep_prob=1.0,
               scope="trilinear"):
     with tf.variable_scope(scope):
+        # [C, Q, C * Q], each shape [batch_size * 2, c_len, 2*q_len, hidden_size]
+        # after flatten, shape [-1, hidden_size]
         flat_args = [flatten(arg, 1) for arg in args]
         flat_args = [tf.nn.dropout(arg, input_keep_prob) for arg in flat_args]
         flat_out = _linear(flat_args, output_size, bias, scope=scope)
@@ -451,6 +464,12 @@ def trilinear(args,
 
 
 def flatten(tensor, keep):
+    """
+    reshape tensor from shape [a, b, ..., keep, z] to [-1, keep, z]
+    :param tensor:
+    :param keep:
+    :return:
+    """
     fixed_shape = tensor.get_shape().as_list()
     start = len(fixed_shape) - keep
     left = reduce(mul, [fixed_shape[i] or tf.shape(tensor)[i] for i in range(start)])

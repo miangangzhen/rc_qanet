@@ -62,10 +62,19 @@ class BRCDataset(object):
         Args:
             data_path: the data file to load
         """
+        start_index = 0
+        end_index = None
+        if type(limit) is tuple or type(limit) is list:
+            start_index = limit[0]
+            end_index = limit[1]
+        elif limit is not None:
+            end_index = limit
         with open(data_path, encoding="utf-8") as fin:
             data_set = []
             for lidx, line in enumerate(fin):
-                if limit is not None and lidx > limit:
+                if lidx < start_index:
+                    continue
+                if end_index is not None and lidx > end_index:
                     break
                 data = {}
                 sample = json.loads(line.strip())
