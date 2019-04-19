@@ -4,6 +4,8 @@ import time
 import logging
 import json
 import tensorflow as tf
+
+from my_code.joint_learning_model import process_feed_dict, question_classification
 from my_code.qanet_layers import regularizer, residual_block, highway, conv, mask_logits, trilinear, total_params, \
     position_embedding
 from my_code.qanet_optimizer import AdamWOptimizer
@@ -93,6 +95,9 @@ class QANET_Model(object):
         self.start_label = tf.placeholder(tf.int32, [None], "answer_label1")
         self.end_label = tf.placeholder(tf.int32, [None], "answer_label2")
 
+        # joint_learning step 1.
+        self.question_type = tf.placeholder(tf.float32, [None, 3], "question_type")
+
         if self.config.use_position_attn:
             self.position_emb = position_embedding(self.c, 2 * self.config.hidden_size)
         self.c_mask = tf.cast(self.c, tf.bool)  # index 0 is padding symbol  N x self.max_p_num, max_p_len
@@ -163,6 +168,9 @@ class QANET_Model(object):
                                                    reuse=True,  # Share the weights between passage and question
                                                    bias=False,
                                                    dropout=self.dropout)
+
+        # joint_learning step 2.
+        self.q_type_logits = question_classification(self.c_embed_encoding, batch_size=N, max_q_len=self.max_q_len, hidden_size=d)
 
     def _fuse(self):
 
@@ -273,6 +281,10 @@ class QANET_Model(object):
             self.loss = tf.reduce_mean(start_loss + end_loss)
         self.logger.info("loss type %s" % self.config.loss_type)
 
+        # joint_learning step 3.
+        classification_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.q_type_logits, labels=self.question_type)
+        self.loss += tf.reduce_mean(classification_loss)
+
         if self.config.l2_norm is not None:
             self.logger.info("applying l2 loss")
             variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
@@ -354,11 +366,14 @@ class QANET_Model(object):
         total_num, total_loss = 0, 0
         log_every_n_batch, n_batch_loss = 500, 0
         for bitx, batch in enumerate(train_batches, 1):
+            # joint_learning step 4.
+            batch = process_feed_dict(batch)
             feed_dict = {self.c: batch['passage_token_ids'],
                          self.q: batch['question_token_ids'],
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
-                         self.dropout: dropout}
+                         self.dropout: dropout,
+                         self.question_type: batch["question_type"]}
 
             _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
             total_loss += loss * len(batch['raw_data'])

@@ -431,8 +431,7 @@ def get_timing_signal_1d(length, channels, min_timescale=1.0, max_timescale=1.0e
     Returns:
     a Tensor of timing signals [1, length, channels]
     """
-    # position = tf.to_float(tf.range(length))
-    position = tf.range(length, dtype=tf.float32)
+    position = tf.to_float(tf.range(length))
     num_timescales = channels // 2
     log_timescale_increment = (
             math.log(float(max_timescale) / float(min_timescale)) /
