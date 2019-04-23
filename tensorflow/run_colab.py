@@ -122,6 +122,7 @@ def parse_args():
     train_settings.add_argument('--max_norm_grad', type=float, default=5.0,
                                 help='max norm grad')
     ###########################################################
+    train_settings.add_argument("--limit", type=str, default=None, help="train data limit")
     return parser.parse_args()
 
 
@@ -180,13 +181,15 @@ def train(args):
     # args.max_p_len = 450
 
     # run on colab
-    args.batch_size = 16
-    args.hidden_size = 96
-    args.head_size = 1
-    limit = 200000
-    args.max_p_len = 500
-    args.decay = 0.9999
-    args.use_position_attn = True
+    # args.batch_size = 16
+    # args.hidden_size = 96
+    # args.head_size = 1
+    # limit = [200000, None]
+    limit = eval(args.limit)
+    # args.max_p_len = 500
+    # args.decay = 0.9999
+    # args.use_position_attn = True
+    # args.epochs = 1
 
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
@@ -203,11 +206,11 @@ def train(args):
     # rc_model = TransformerModel(vocab, args)
     # try load from check point
     if tf.gfile.Exists(args.checkpoint_dir):
-        rc_model.restore(model_dir=args.checkpoint_dir, model_prefix="save_every_log_every_n_batch-1100")
+        rc_model.restore(model_dir=args.checkpoint_dir)
     logger.info('Training the model...')
     rc_model.train(brc_data, args.epochs, args.batch_size, save_dir=args.model_dir,
                    save_prefix=args.algo,
-                   dropout_keep_prob=args.dropout_keep_prob, evaluate=False)
+                   dropout_keep_prob=args.dropout_keep_prob, evaluate=True)
     logger.info('Done with model training!')
 
 
@@ -240,6 +243,27 @@ def predict(args):
     """
     predicts answers for test files
     """
+
+    # args.max_p_num = 2
+    args.loss_type = "cross_entropy"
+    args.optim = "adam"
+    args.dropout_keep_prob = 1.0
+
+    # run on gpu
+    # args.batch_size = 8
+    # args.hidden_size = 96
+    # args.head_size = 1
+    # limit=None
+    # args.max_p_len = 450
+
+    # run on colab
+    args.batch_size = 16
+    args.hidden_size = 96
+    args.head_size = 1
+    args.max_p_len = 500
+    args.decay = 0.9999
+    args.use_position_attn = True
+
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
     with open(os.path.join(args.vocab_dir, 'vocab.data'), 'rb') as fin:
@@ -250,10 +274,12 @@ def predict(args):
     logger.info('Converting text into ids...')
     brc_data.convert_to_ids(vocab)
     logger.info('Restoring the model...')
-    rc_model = RCModel(vocab, args)
-    rc_model.restore(model_dir=args.model_dir, model_prefix=args.algo)
+    rc_model = QANET_Model(vocab, args)
+    # rc_model.restore(model_dir=args.model_dir, model_prefix=args.algo)
+    if tf.gfile.Exists(args.checkpoint_dir):
+        rc_model.restore(model_dir=args.checkpoint_dir, model_prefix=None)
     logger.info('Predicting answers for test set...')
-    test_batches = brc_data.gen_mini_batches('test', args.batch_size,
+    test_batches = brc_data.gen_mini_batches_for_qanet('test', args.batch_size,
                                              pad_id=vocab.get_id(vocab.pad_token), shuffle=False)
     rc_model.evaluate(test_batches,
                       result_dir=args.result_dir, result_prefix='test.predicted')

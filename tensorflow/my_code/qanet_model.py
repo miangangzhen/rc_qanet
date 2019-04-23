@@ -96,7 +96,7 @@ class QANET_Model(object):
         self.end_label = tf.placeholder(tf.int32, [None], "answer_label2")
 
         # joint_learning step 1.
-        self.question_type = tf.placeholder(tf.float32, [None, 3], "question_type")
+        # self.question_type = tf.placeholder(tf.float32, [None, 3], "question_type")
 
         if self.config.use_position_attn:
             self.position_emb = position_embedding(self.c, 2 * self.config.hidden_size)
@@ -122,7 +122,7 @@ class QANET_Model(object):
                                                        initializer=tf.constant_initializer(
                                                           self.vocab.embeddings[2:],
                                                           dtype=tf.float32),
-                                                       trainable=False)
+                                                       trainable=True)
             self.word_pad_unk_mat = tf.get_variable("word_unk_pad",
                                                     [2, self.pretrained_word_mat.get_shape()[1]],
                                                     dtype=tf.float32,
@@ -170,7 +170,7 @@ class QANET_Model(object):
                                                    dropout=self.dropout)
 
         # joint_learning step 2.
-        self.q_type_logits = question_classification(self.c_embed_encoding, batch_size=N, max_q_len=self.max_q_len, hidden_size=d)
+        # self.q_type_logits = question_classification(self.c_embed_encoding, batch_size=N, max_q_len=self.max_q_len, hidden_size=d)
 
     def _fuse(self):
 
@@ -282,8 +282,8 @@ class QANET_Model(object):
         self.logger.info("loss type %s" % self.config.loss_type)
 
         # joint_learning step 3.
-        classification_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.q_type_logits, labels=self.question_type)
-        self.loss += tf.reduce_mean(classification_loss)
+        # classification_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.q_type_logits, labels=self.question_type)
+        # self.loss += tf.reduce_mean(classification_loss)
 
         if self.config.l2_norm is not None:
             self.logger.info("applying l2 loss")
@@ -372,8 +372,8 @@ class QANET_Model(object):
                          self.q: batch['question_token_ids'],
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
-                         self.dropout: dropout,
-                         self.question_type: batch["question_type"]}
+                         self.dropout: dropout,}
+                         #self.question_type: batch["question_type"]}
 
             _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
             total_loss += loss * len(batch['raw_data'])
