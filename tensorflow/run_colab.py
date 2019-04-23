@@ -168,10 +168,10 @@ def train(args):
     """
     # 通用
     # 数据增强后，max_p_num 5 => 2
-    args.max_p_num = 2
-    args.loss_type = "cross_entropy"
-    args.optim = "adam"
-    args.dropout_keep_prob = 0.9
+    # args.max_p_num = 2
+    # args.loss_type = "cross_entropy"
+    # args.optim = "adam"
+    # args.dropout_keep_prob = 0.9
 
     # run on gpu
     # args.batch_size = 8
