@@ -112,6 +112,9 @@ class RCModel(object):
         # joint_learning step 1.
         self.question_type = tf.placeholder(tf.float32, [None, 3], "question_type")
 
+        self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
+                                           initializer=tf.constant_initializer(0), trainable=False)
+
     def _embed(self):
         """
         The embedding layer, question and passage share embeddings
@@ -236,7 +239,7 @@ class RCModel(object):
             self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
         else:
             raise NotImplementedError('Unsupported optimizer: {}'.format(self.optim_type))
-        self.train_op = self.optimizer.minimize(self.loss)
+        self.train_op = self.optimizer.minimize(self.loss, global_step=self.global_step)
 
     def _train_epoch(self, train_batches, dropout_keep_prob):
         """
@@ -258,7 +261,7 @@ class RCModel(object):
                          self.end_label: batch['end_id'],
                          self.dropout_keep_prob: dropout_keep_prob,
                          self.question_type: batch["question_type"]}
-            _, loss = self.sess.run([self.train_op, self.loss], feed_dict)
+            _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
             n_batch_loss += loss
@@ -267,7 +270,7 @@ class RCModel(object):
                     bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch))
                 n_batch_loss = 0
                 # save to checkpoint
-                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"))
+                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"), global_step=global_step)
 
         return 1.0 * total_loss / total_num
 
