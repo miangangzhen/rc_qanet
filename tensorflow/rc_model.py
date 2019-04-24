@@ -27,6 +27,8 @@ import logging
 import json
 import numpy as np
 import tensorflow as tf
+
+from my_code.joint_learning_model import question_classification, process_feed_dict
 from utils import compute_bleu_rouge
 from utils import normalize
 from layers.basic_rnn import rnn
@@ -107,6 +109,9 @@ class RCModel(object):
         self.end_label = tf.placeholder(tf.int32, [None])
         self.dropout_keep_prob = tf.placeholder(tf.float32)
 
+        # joint_learning step 1.
+        self.question_type = tf.placeholder(tf.float32, [None, 3], "question_type")
+
     def _embed(self):
         """
         The embedding layer, question and passage share embeddings
@@ -134,6 +139,9 @@ class RCModel(object):
             # [batch_size*max_passage_num, sequence_length, hidden_size*2]
             self.sep_p_encodes = tf.nn.dropout(self.sep_p_encodes, self.dropout_keep_prob)
             self.sep_q_encodes = tf.nn.dropout(self.sep_q_encodes, self.dropout_keep_prob)
+
+        # joint_learning step 2.
+        self.q_type_logits = question_classification(self.sep_q_encodes, batch_size=tf.shape(self.start_label)[0], max_q_len=self.max_q_len, hidden_size=self.hidden_size*2)
 
     def _match(self):
         """
@@ -203,7 +211,12 @@ class RCModel(object):
         self.start_loss = sparse_nll_loss(probs=self.start_probs, labels=self.start_label)
         self.end_loss = sparse_nll_loss(probs=self.end_probs, labels=self.end_label)
         self.all_params = tf.trainable_variables()
-        self.loss = tf.reduce_mean(tf.add(self.start_loss, self.end_loss))
+        self.rc_loss = tf.reduce_mean(tf.add(self.start_loss, self.end_loss))
+
+        # joint_learning step 3.
+        self.classification_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.q_type_logits, labels=self.question_type))
+        self.loss = self.rc_loss + self.classification_loss
+
         if self.weight_decay > 0:
             with tf.variable_scope('l2_loss'):
                 l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in self.all_params])
@@ -235,13 +248,16 @@ class RCModel(object):
         total_num, total_loss = 0, 0
         log_every_n_batch, n_batch_loss = 50, 0
         for bitx, batch in enumerate(train_batches, 1):
+            # joint_learning step 4.
+            batch = process_feed_dict(batch)
             feed_dict = {self.p: batch['passage_token_ids'],
                          self.q: batch['question_token_ids'],
                          self.p_length: batch['passage_length'],
                          self.q_length: batch['question_length'],
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
-                         self.dropout_keep_prob: dropout_keep_prob}
+                         self.dropout_keep_prob: dropout_keep_prob,
+                         self.question_type: batch["question_type"]}
             _, loss = self.sess.run([self.train_op, self.loss], feed_dict)
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
@@ -414,9 +430,13 @@ class RCModel(object):
         self.saver.save(self.sess, os.path.join(model_dir, model_prefix))
         self.logger.info('Model saved in {}, with prefix {}.'.format(model_dir, model_prefix))
 
-    def restore(self, model_dir, model_prefix):
+    def restore(self, model_dir, model_prefix=None):
         """
         Restores the model into model_dir from model_prefix as the model indicator
         """
-        self.saver.restore(self.sess, os.path.join(model_dir, model_prefix))
-        self.logger.info('Model restored from {}, with prefix {}'.format(model_dir, model_prefix))
+        if model_prefix is None:
+            path = tf.train.latest_checkpoint(model_dir)
+        else:
+            path = os.path.join(model_dir, model_prefix)
+        self.saver.restore(self.sess, path)
+        self.logger.info('Model restored from {}'.format(path))

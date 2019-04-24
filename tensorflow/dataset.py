@@ -203,7 +203,8 @@ class BRCDataset(object):
         Dynamically pads the batch_data with pad_id
         """
         pad_p_len = min(self.max_p_len, max(batch_data['passage_length']))
-        pad_q_len = min(self.max_q_len, max(batch_data['question_length']))
+        # pad_q_len = min(self.max_q_len, max(batch_data['question_length']))
+        pad_q_len = self.max_q_len
         batch_data['passage_token_ids'] = [(ids + [pad_id] * (pad_p_len - len(ids)))[: pad_p_len]
                                            for ids in batch_data['passage_token_ids']]
         batch_data['question_token_ids'] = [(ids + [pad_id] * (pad_q_len - len(ids)))[: pad_q_len]

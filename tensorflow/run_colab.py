@@ -201,8 +201,8 @@ def train(args):
     brc_data.convert_to_ids(vocab)
     logger.info('Initialize the model...')
 
-    rc_model = QANET_Model(vocab, args)
-    # rc_model = RCModel(vocab, args)
+    # rc_model = QANET_Model(vocab, args)
+    rc_model = RCModel(vocab, args)
     # rc_model = TransformerModel(vocab, args)
     # try load from check point
     if tf.gfile.Exists(args.checkpoint_dir):
