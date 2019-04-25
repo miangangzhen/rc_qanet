@@ -66,7 +66,8 @@ class BRCDataset(object):
         end_index = None
         no_span_count = 0
         span_out_of_max_p_len_count = 0
-        span_start_equals_end_count = 0
+        solo_answer_count = 0
+
         if type(limit) is tuple or type(limit) is list:
             start_index = limit[0]
             end_index = limit[1]
@@ -75,6 +76,7 @@ class BRCDataset(object):
         with open(data_path, encoding="utf-8") as fin:
             data_set = []
             for lidx, line in enumerate(fin):
+                is_solo_answer = False
                 if lidx < start_index:
                     continue
                 if end_index is not None and lidx > end_index:
@@ -89,8 +91,7 @@ class BRCDataset(object):
                         span_out_of_max_p_len_count += 1
                         continue
                     if sample["answer_spans"][0][1] - sample["answer_spans"][0][0] <= 0:
-                        span_start_equals_end_count += 1
-                        continue
+                        is_solo_answer = True
                 if "answer_spans" in sample.keys():
                     data["answer_spans"] = sample["answer_spans"]
                 if 'answer_docs' in sample:
@@ -157,12 +158,18 @@ class BRCDataset(object):
                             fake_passage_tokens += para_info[0]
                         data['passages'].append({'passage_tokens': fake_passage_tokens})
 
+                # 如果答案只有一个字，要判断下它是不是只有句号这种干扰训练的脏数据。
+                if is_solo_answer:
+                    if len("".join(data["passages"][data["answer_passages"][0]]["passage_tokens"][
+                                  data["answer_spans"][0][0]:data["answer_spans"][0][1] + 1])) == 1:
+                        solo_answer_count += 1
+                        continue
                 data_set.append(data)
             print("data from" + data_path)
             print("total data: {}, use data: {}".format(lidx+1, len(data_set)))
             print("span_out_of_max_p_len_count", span_out_of_max_p_len_count)
             print("no_span_count", no_span_count)
-            print("span_start_equals_end_count", span_start_equals_end_count)
+            print("solo_answer_count", solo_answer_count)
         return data_set
 
     def _one_mini_batch(self, data, indices, pad_id):
