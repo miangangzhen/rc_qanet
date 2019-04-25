@@ -249,7 +249,7 @@ class RCModel(object):
             dropout_keep_prob: float value indicating dropout keep probability
         """
         total_num, total_loss = 0, 0
-        log_every_n_batch, n_batch_loss = 50, 0
+        log_every_n_batch, n_batch_loss = 250, 0
         for bitx, batch in enumerate(train_batches, 1):
             # joint_learning step 4.
             batch = process_feed_dict(batch)
@@ -324,13 +324,15 @@ class RCModel(object):
         pred_answers, ref_answers = [], []
         total_loss, total_num = 0, 0
         for b_itx, batch in enumerate(eval_batches):
+            batch = process_feed_dict(batch)
             feed_dict = {self.p: batch['passage_token_ids'],
                          self.q: batch['question_token_ids'],
                          self.p_length: batch['passage_length'],
                          self.q_length: batch['question_length'],
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
-                         self.dropout_keep_prob: 1.0}
+                         self.dropout_keep_prob: 1.0,
+                         self.question_type: batch["question_type"]}
             start_probs, end_probs, loss = self.sess.run([self.start_probs,
                                                           self.end_probs, self.loss], feed_dict)
 
