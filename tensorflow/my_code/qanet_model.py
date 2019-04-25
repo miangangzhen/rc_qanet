@@ -259,11 +259,17 @@ class QANET_Model(object):
             negative log likelyhood loss
             """
             with tf.name_scope(scope, "log_loss"):
-                losses = - tf.reduce_sum(labels * tf.log(probs + epsilon), 1)
+                losses = - tf.reduce_sum(labels * tf.log(tf.nn.softmax(probs) + epsilon), 1)
             return losses
 
         self.start_label_onehot = tf.one_hot(self.start_label, tf.shape(self.logits1)[1], axis=1)
         self.end_label_onehot = tf.one_hot(self.end_label, tf.shape(self.logits2)[1], axis=1)
+
+        # tmp for debug##############
+        # self.logits_mean1 = tf.reduce_mean(self.logits1)
+        # self.logits_argmax1 = tf.argmax(self.logits1, -1)
+        # self.logits_argmax2 = tf.argmax(self.logits2, -1)
+        #####################
 
         if self.config.loss_type == 'cross_entropy':
             start_loss = tf.nn.softmax_cross_entropy_with_logits(
@@ -376,6 +382,7 @@ class QANET_Model(object):
                          #self.question_type: batch["question_type"]}
 
             _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
+
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
             n_batch_loss += loss

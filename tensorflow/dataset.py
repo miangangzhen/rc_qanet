@@ -64,6 +64,9 @@ class BRCDataset(object):
         """
         start_index = 0
         end_index = None
+        no_span_count = 0
+        span_out_of_max_p_len_count = 0
+        span_start_equals_end_count = 0
         if type(limit) is tuple or type(limit) is list:
             start_index = limit[0]
             end_index = limit[1]
@@ -80,8 +83,13 @@ class BRCDataset(object):
                 sample = json.loads(line.strip())
                 if train:
                     if len(sample['answer_spans']) == 0:
+                        no_span_count += 1
                         continue
                     if sample['answer_spans'][0][1] >= self.max_p_len:
+                        span_out_of_max_p_len_count += 1
+                        continue
+                    if sample["answer_spans"][0][1] - sample["answer_spans"][0][0] <= 0:
+                        span_start_equals_end_count += 1
                         continue
                 if "answer_spans" in sample.keys():
                     data["answer_spans"] = sample["answer_spans"]
@@ -152,6 +160,9 @@ class BRCDataset(object):
                 data_set.append(data)
             print("data from" + data_path)
             print("total data: {}, use data: {}".format(lidx+1, len(data_set)))
+            print("span_out_of_max_p_len_count", span_out_of_max_p_len_count)
+            print("no_span_count", no_span_count)
+            print("span_start_equals_end_count", span_start_equals_end_count)
         return data_set
 
     def _one_mini_batch(self, data, indices, pad_id):
