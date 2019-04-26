@@ -29,7 +29,8 @@ import numpy as np
 import tensorflow as tf
 import tqdm
 
-from my_code.joint_learning_model import question_classification, process_feed_dict
+from my_code.joint_learning_model import question_classification, process_feed_dict, yes_no_classification, \
+    YES_NO_ANSWER_LIST
 from utils import compute_bleu_rouge
 from utils import normalize
 from layers.basic_rnn import rnn
@@ -112,6 +113,7 @@ class RCModel(object):
 
         # joint_learning step 1.
         self.question_type = tf.placeholder(tf.float32, [None, 3], "question_type")
+        self.yes_no_answer = tf.placeholder(tf.float32, [None, 5], "yes_no_answer")
 
         self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
                                            initializer=tf.constant_initializer(0), trainable=False)
@@ -145,7 +147,11 @@ class RCModel(object):
             self.sep_q_encodes = tf.nn.dropout(self.sep_q_encodes, self.dropout_keep_prob)
 
         # joint_learning step 2.
-        self.q_type_logits = question_classification(self.sep_q_encodes, batch_size=tf.shape(self.start_label)[0], max_q_len=self.max_q_len, hidden_size=self.hidden_size*2)
+        self.q_type_logits = question_classification(
+            self.sep_q_encodes, batch_size=tf.shape(self.start_label)[0], max_q_len=self.max_q_len, hidden_size=self.hidden_size*2)
+
+        self.yes_no_logits = yes_no_classification(
+            self.sep_p_encodes, batch_size=tf.shape(self.start_label)[0], max_p_len=self.max_p_len, hidden_size=self.hidden_size*2, num_passage=self.max_p_num)
 
     def _match(self):
         """
@@ -218,8 +224,9 @@ class RCModel(object):
         self.rc_loss = tf.reduce_mean(tf.add(self.start_loss, self.end_loss))
 
         # joint_learning step 3.
-        self.classification_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.q_type_logits, labels=self.question_type))
-        self.loss = self.rc_loss + self.classification_loss
+        self.classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.q_type_logits, labels=self.question_type))
+        self.yes_no_answer_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.yes_no_logits, labels=self.yes_no_answer))
+        self.loss = self.rc_loss + self.classification_loss + self.yes_no_answer_loss
 
         if self.weight_decay > 0:
             with tf.variable_scope('l2_loss'):
@@ -261,7 +268,8 @@ class RCModel(object):
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
                          self.dropout_keep_prob: dropout_keep_prob,
-                         self.question_type: batch["question_type"]}
+                         self.question_type: batch["question_type"],
+                         self.yes_no_answer: batch["yes_no_answer"]}
             _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
@@ -333,15 +341,18 @@ class RCModel(object):
                          self.start_label: batch['start_id'],
                          self.end_label: batch['end_id'],
                          self.dropout_keep_prob: 1.0,
-                         self.question_type: batch["question_type"]}
-            start_probs, end_probs, loss = self.sess.run([self.start_probs,
-                                                          self.end_probs, self.loss], feed_dict)
+                         self.question_type: batch["question_type"],
+                         self.yes_no_answer: batch["yes_no_answer"]}
+            start_probs, end_probs, loss, yes_no_logits = self.sess.run([self.start_probs,
+                                                          self.end_probs, self.loss, self.yes_no_logits], feed_dict)
 
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
 
             padded_p_len = len(batch['passage_token_ids'][0])
-            for sample, start_prob, end_prob in zip(batch['raw_data'], start_probs, end_probs):
+            # joint_learning step 5.
+            for sample, start_prob, end_prob, yes_no in zip(batch['raw_data'], start_probs, end_probs, yes_no_logits):
+                yes_no_result = [YES_NO_ANSWER_LIST[x] for x in np.argsort(yes_no)[::-1] if yes_no[x] >= 0.5 and x != 0]
 
                 best_answer = self.find_best_answer(sample, start_prob, end_prob, padded_p_len)
                 if save_full_info:
@@ -352,7 +363,7 @@ class RCModel(object):
                                          'question_type': sample['question_type'],
                                          'answers': [best_answer],
                                          'entity_answers': [[]],
-                                         'yesno_answers': []})
+                                         'yesno_answers': yes_no_result})
                 if 'answers' in sample:
                     ref_answers.append({'question_id': sample['question_id'],
                                          'question_type': sample['question_type'],
@@ -362,7 +373,7 @@ class RCModel(object):
 
         if result_dir is not None and result_prefix is not None:
             result_file = os.path.join(result_dir, result_prefix + '.json')
-            with open(result_file, 'w') as fout:
+            with open(result_file, 'w', encoding="utf-8") as fout:
                 for pred_answer in pred_answers:
                     fout.write(json.dumps(pred_answer, ensure_ascii=False) + '\n')
 

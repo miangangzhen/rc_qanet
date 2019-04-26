@@ -195,7 +195,7 @@ class BRCDataset(object):
             for pidx in range(max_passage_num):
                 if pidx < len(sample['passages']):
                     batch_data['question_token_ids'].append(sample['question_token_ids'])
-                    batch_data['question_length'].append(len(sample['question_token_ids']))
+                    batch_data['question_length'].append(min(len(sample['question_token_ids']), self.max_q_len))
                     passage_token_ids = sample['passages'][pidx]['passage_token_ids']
                     batch_data['passage_token_ids'].append(passage_token_ids)
                     batch_data['passage_length'].append(min(len(passage_token_ids), self.max_p_len))
@@ -220,7 +220,8 @@ class BRCDataset(object):
         """
         Dynamically pads the batch_data with pad_id
         """
-        pad_p_len = min(self.max_p_len, max(batch_data['passage_length']))
+        # pad_p_len = min(self.max_p_len, max(batch_data['passage_length']))
+        pad_p_len = self.max_p_len
         # pad_q_len = min(self.max_q_len, max(batch_data['question_length']))
         pad_q_len = self.max_q_len
         batch_data['passage_token_ids'] = [(ids + [pad_id] * (pad_p_len - len(ids)))[: pad_p_len]

@@ -123,19 +123,15 @@ def sample_data_to_read(path):
     tf.logging.warn(path)
 
     param = get_default_param()
+    yes_no_count = 0
+    total_count = 0
+    yes_no_dist = {}
 
-    i = 0
-    for sample in tqdm(load_dataset(os.path.join(ROOT_PATH, path), param)):
-        if i == 0:
-            tf.logging.info(sample.keys())
-
+    for sample in load_dataset(os.path.join(ROOT_PATH, path), param):
         tf.logging.info("question type: ")
         tf.logging.info(sample["question_type"])
         tf.logging.info("question tokens: ")
         tf.logging.info(sample["question_tokens"])
-
-        # tf.logging.info("passage: ")
-        # tf.logging.info(sample["passages"])
 
         if "answers" in sample.keys():
             tf.logging.info("answer: ")
@@ -144,23 +140,31 @@ def sample_data_to_read(path):
         if "answer_spans" in sample.keys():
             tf.logging.info("answer span: ")
             tf.logging.info(sample["answer_spans"])
-            # if len(sample['answer_spans']) != 0:
-            #     answer_len_list.append(sample["answer_spans"][0][1] - sample["answer_spans"][0][0])
         if 'answer_passages' in sample.keys():
             tf.logging.info("answer passages: ")
-            tf.logging.info(sample["answer_passages"])
-            # for x in sample["answer_passages"]:
-            #     answer_passage_dict[x] += 1
-            print("".join(sample["documents"][sample["answer_docs"][0]]["passage_tokens"][
-                    sample["answer_spans"][0][0]:sample["answer_spans"][0][1] + 1]))
-        time.sleep(10)
+
+            # most_related_para = sample["documents"][sample["answer_docs"][0]]['most_related_para']
+            # tf.logging.info("".join(sample["documents"][sample["answer_docs"][0]]["segmented_paragraphs"][most_related_para][
+            #         sample["answer_spans"][0][0]:sample["answer_spans"][0][1] + 1]))
+
+        if "yesno_answers" in sample.keys():
+            # tf.logging.warn(sample["yesno_answers"])
+            for item in sample["yesno_answers"]:
+                yes_no_dist[item] = yes_no_dist.get(item, 0) + 1
+            yes_no_count += 1
+        total_count += 1
+        tf.logging.info("=======================================")
+
+    print(yes_no_count)
+    print(yes_no_count / total_count * 100)
+    print(yes_no_dist)
 
 
 if __name__ == "__main__":
 
-    # tf.logging.set_verbosity("WARN")
-    tf.logging.set_verbosity("INFO")
-    # for path in [TRAIN_SEARCH_PATH, TRAIN_ZD_PATH, DEV_SEARCH_PATH, DEV_ZD_PATH, TEST_SEARCH_PATH, TEST_ZD_PATH]:
-    for path in [DEV_SEARCH_PATH, DEV_ZD_PATH, TEST_SEARCH_PATH, TEST_ZD_PATH]:
+    tf.logging.set_verbosity("WARN")
+    # tf.logging.set_verbosity("INFO")
+    for path in [TRAIN_SEARCH_PATH, TRAIN_ZD_PATH, DEV_SEARCH_PATH, DEV_ZD_PATH, TEST_SEARCH_PATH, TEST_ZD_PATH]:
+    # for path in [DEV_SEARCH_PATH, DEV_ZD_PATH, TEST_SEARCH_PATH, TEST_ZD_PATH]:
     #     statistic_plot(path)
         sample_data_to_read(path)
