@@ -245,9 +245,9 @@ def predict(args):
     """
 
     # args.max_p_num = 2
-    args.loss_type = "cross_entropy"
-    args.optim = "adam"
-    args.dropout_keep_prob = 1.0
+    # args.loss_type = "cross_entropy"
+    # args.optim = "adam"
+    # args.dropout_keep_prob = 1.0
 
     # run on gpu
     # args.batch_size = 8
@@ -257,12 +257,12 @@ def predict(args):
     # args.max_p_len = 450
 
     # run on colab
-    args.batch_size = 16
-    args.hidden_size = 96
-    args.head_size = 1
-    args.max_p_len = 500
-    args.decay = 0.9999
-    args.use_position_attn = True
+    # args.batch_size = 16
+    # args.hidden_size = 96
+    # args.head_size = 1
+    # args.max_p_len = 500
+    # args.decay = 0.9999
+    # args.use_position_attn = True
 
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
@@ -274,13 +274,16 @@ def predict(args):
     logger.info('Converting text into ids...')
     brc_data.convert_to_ids(vocab)
     logger.info('Restoring the model...')
-    rc_model = QANET_Model(vocab, args)
+    # rc_model = QANET_Model(vocab, args)
+    rc_model = RCModel(vocab, args)
     # rc_model.restore(model_dir=args.model_dir, model_prefix=args.algo)
     if tf.gfile.Exists(args.checkpoint_dir):
         rc_model.restore(model_dir=args.checkpoint_dir, model_prefix=None)
     logger.info('Predicting answers for test set...')
-    test_batches = brc_data.gen_mini_batches_for_qanet('test', args.batch_size,
-                                             pad_id=vocab.get_id(vocab.pad_token), shuffle=False)
+    # test_batches = brc_data.gen_mini_batches_for_qanet('test', args.batch_size,
+    #                                          pad_id=vocab.get_id(vocab.pad_token), shuffle=False)
+    test_batches = brc_data.gen_mini_batches('test', args.batch_size,
+                                                       pad_id=vocab.get_id(vocab.pad_token), shuffle=False)
     rc_model.evaluate(test_batches,
                       result_dir=args.result_dir, result_prefix='test.predicted')
 

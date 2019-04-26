@@ -27,6 +27,7 @@ import logging
 import json
 import numpy as np
 import tensorflow as tf
+import tqdm
 
 from my_code.joint_learning_model import question_classification, process_feed_dict
 from utils import compute_bleu_rouge
@@ -323,7 +324,7 @@ class RCModel(object):
         """
         pred_answers, ref_answers = [], []
         total_loss, total_num = 0, 0
-        for b_itx, batch in enumerate(eval_batches):
+        for b_itx, batch in tqdm.tqdm(enumerate(eval_batches)):
             batch = process_feed_dict(batch)
             feed_dict = {self.p: batch['passage_token_ids'],
                          self.q: batch['question_token_ids'],

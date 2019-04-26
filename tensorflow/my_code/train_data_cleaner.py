@@ -54,7 +54,6 @@ class DataClean(BRCDataset):
                             skip_count += 1
                             continue
 
-
                     # if "answer_spans" in sample.keys():
                     data["answer_spans"] = sample["answer_spans"]
                     # if 'answer_docs' in sample:
@@ -82,6 +81,7 @@ class DataClean(BRCDataset):
                     ############################################################
 
                     # 训练数据筛选 #############################################
+                    # 检查人工编写的answer与span_start,span_end截取的内容是否相关
                     answer_length = len(data["answers"])
                     if answer_length > 0:
                         best_score = 0.0
@@ -97,6 +97,10 @@ class DataClean(BRCDataset):
                                 best_score = score
                         if best_score < 0.01:
                             skip_count += 1
+                            # print(data["answers"])
+                            # print("".join(data["documents"][data["answer_docs"][0]]["passage_tokens"][
+                            #                       data["answer_spans"][0][0]:data["answer_spans"][0][1] + 1]))
+                            # print("====")
                             continue
                     ##########################################################
 
@@ -106,7 +110,6 @@ class DataClean(BRCDataset):
                         doc.pop("paragraphs")
                         doc.pop("segmented_title")
                         doc.pop("title")
-
 
                     origin_answer_doc_id = sample['answer_docs'][0]
                     passage_num = len(sample["documents"])
