@@ -249,7 +249,7 @@ class RCModel(object):
             raise NotImplementedError('Unsupported optimizer: {}'.format(self.optim_type))
         self.train_op = self.optimizer.minimize(self.loss, global_step=self.global_step)
 
-    def _train_epoch(self, train_batches, dropout_keep_prob):
+    def _train_epoch(self, train_batches, dropout_keep_prob, data, batch_size, pad_id):
         """
         Trains the model for a single epoch.
         Args:
@@ -275,11 +275,19 @@ class RCModel(object):
             total_num += len(batch['raw_data'])
             n_batch_loss += loss
             if log_every_n_batch > 0 and bitx % log_every_n_batch == 0:
-                self.logger.info('Average loss from batch {} to {} is {}'.format(
-                    bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch))
+                self.logger.info('Average loss from batch {} to {} is {}, current step is {}'.format(
+                    bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch, global_step))
                 n_batch_loss = 0
                 # save to checkpoint
                 self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"), global_step=global_step)
+            if log_every_n_batch > 0 and bitx % (log_every_n_batch*4) == 0:
+                self.logger.info('Evaluating the model after global_step {}'.format(global_step))
+                if data.dev_set is not None:
+                    eval_batches = data.gen_mini_batches('dev', batch_size, pad_id, shuffle=False)
+                    eval_loss, bleu_rouge = self.evaluate(eval_batches)
+                    self.logger.info('Dev eval loss {}'.format(eval_loss))
+                    self.logger.info('Dev eval result: {}'.format(bleu_rouge))
+
 
         return 1.0 * total_loss / total_num
 
@@ -301,7 +309,7 @@ class RCModel(object):
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches('train', batch_size, pad_id, shuffle=True)
-            train_loss = self._train_epoch(train_batches, dropout_keep_prob)
+            train_loss = self._train_epoch(train_batches, dropout_keep_prob, data, batch_size, pad_id)
             self.logger.info('Average train loss for epoch {} is {}'.format(epoch, train_loss))
 
             if evaluate:
