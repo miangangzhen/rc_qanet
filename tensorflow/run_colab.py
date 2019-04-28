@@ -244,7 +244,7 @@ def predict(args):
     predicts answers for test files
     """
 
-    # args.max_p_num = 2
+    args.max_p_num = 5
     # args.loss_type = "cross_entropy"
     # args.optim = "adam"
     # args.dropout_keep_prob = 1.0

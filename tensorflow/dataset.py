@@ -189,8 +189,9 @@ class BRCDataset(object):
                       'passage_length': [],
                       'start_id': [],
                       'end_id': []}
-        max_passage_num = max([len(sample['passages']) for sample in batch_data['raw_data']])
-        max_passage_num = min(self.max_p_num, max_passage_num)
+        # max_passage_num = max([len(sample['passages']) for sample in batch_data['raw_data']])
+        # max_passage_num = min(self.max_p_num, max_passage_num)
+        max_passage_num = self.max_p_num
         for sidx, sample in enumerate(batch_data['raw_data']):
             for pidx in range(max_passage_num):
                 if pidx < len(sample['passages']):
