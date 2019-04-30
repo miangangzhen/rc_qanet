@@ -91,7 +91,7 @@ def parse_args():
                                default=["../data/dev_preprocessed/devset/search.dev.json", "../data/dev_preprocessed/devset/zhidao.dev.json"], #  ['../data/demo/devset/search.dev.json'],
                                help='list of files that contain the preprocessed dev data')
     path_settings.add_argument('--test_files', nargs='+',
-                               default=["../data/test1_preprocessed/test1set/search.test1.json", "../data/test1_preprocessed/test1set/zhidao.test1.json"], #  ['../data/demo/testset/search.test.json'],
+                               default=["../data/test1_preprocessed/test1set/search.test1.json"],# "../data/test1_preprocessed/test1set/zhidao.test1.json"], #  ['../data/demo/testset/search.test.json'],
                                help='list of files that contain the preprocessed test data')
     path_settings.add_argument('--brc_dir', default='../data/baidu',
                                help='the dir with preprocessed baidu reading comprehension data')
@@ -100,7 +100,7 @@ def parse_args():
     path_settings.add_argument('--model_dir', default='models/',
                                help='the dir to store models')
     path_settings.add_argument("--checkpoint_dir", default="checkpoint/")
-    path_settings.add_argument('--result_dir', default='../data/results/',
+    path_settings.add_argument('--result_dir', default='results/',
                                help='the dir to output the results')
     path_settings.add_argument('--summary_dir', default='../data/summary/',
                                help='the dir to write tensorboard summary')
@@ -168,25 +168,24 @@ def train(args):
     # 通用
     # 数据增强后，max_p_num 5 => 2
     args.max_p_num = 2
-    args.loss_type = "cross_entropy"
+    # args.loss_type = "cross_entropy"
+    args.loss_type = "sparse_nll_loss"
     args.optim = "adam"
     args.dropout_keep_prob = 0.9
+
+    # run on cpu
+    args.batch_size = 4
+    args.hidden_size = 32
+    args.head_size = 1
+    limit = [0, 2000]
+    args.max_p_len = 400
 
     # run on gpu
     # args.batch_size = 8
     # args.hidden_size = 96
     # args.head_size = 1
-    # limit=None
+    # limit=20000
     # args.max_p_len = 450
-
-    # run on colab
-    args.batch_size = 32
-    args.hidden_size = 96
-    args.head_size = 1
-    limit = None
-    args.max_p_len = 500
-    args.decay = 0.9999
-    args.use_position_attn = True
 
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
@@ -198,16 +197,16 @@ def train(args):
     brc_data.convert_to_ids(vocab)
     logger.info('Initialize the model...')
 
-    rc_model = QANET_Model(vocab, args)
-    # rc_model = RCModel(vocab, args)
+    # rc_model = QANET_Model(vocab, args)
+    rc_model = RCModel(vocab, args)
     # rc_model = TransformerModel(vocab, args)
     # try load from check point
     if tf.gfile.Exists(args.checkpoint_dir):
-        rc_model.restore(model_dir=args.checkpoint_dir, model_prefix="save_every_log_every_n_batch")
+        rc_model.restore(model_dir=args.checkpoint_dir)
     logger.info('Training the model...')
     rc_model.train(brc_data, args.epochs, args.batch_size, save_dir=args.model_dir,
                    save_prefix=args.algo,
-                   dropout_keep_prob=args.dropout_keep_prob, evaluate=False)
+                   dropout_keep_prob=args.dropout_keep_prob, evaluate=True)
     logger.info('Done with model training!')
 
 
@@ -240,6 +239,18 @@ def predict(args):
     """
     predicts answers for test files
     """
+    args.max_p_num = 5
+    # args.loss_type = "cross_entropy"
+    # args.loss_type = "sparse_nll_loss"
+    args.optim = "adam"
+    args.dropout_keep_prob = 1.0
+
+    # run on cpu
+    args.batch_size = 4
+    args.hidden_size = 32
+    args.head_size = 1
+    args.max_p_len = 400
+
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
     with open(os.path.join(args.vocab_dir, 'vocab.data'), 'rb') as fin:
@@ -251,7 +262,7 @@ def predict(args):
     brc_data.convert_to_ids(vocab)
     logger.info('Restoring the model...')
     rc_model = RCModel(vocab, args)
-    rc_model.restore(model_dir=args.model_dir, model_prefix=args.algo)
+    rc_model.restore(model_dir=args.checkpoint_dir)
     logger.info('Predicting answers for test set...')
     test_batches = brc_data.gen_mini_batches('test', args.batch_size,
                                              pad_id=vocab.get_id(vocab.pad_token), shuffle=False)

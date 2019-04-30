@@ -30,25 +30,25 @@ def custom_dynamic_rnn(cell, inputs, inputs_len, initial_state=None):
     seem to require the hidden unit and memory unit has the same dimension, and we cannot
     store the scores directly in the hidden unit.
     Args:
-        cell: RNN cell
-        inputs: the input sequence to rnn
-        inputs_len: valid length
-        initial_state: initial_state of the cell
+        cell: RNN cell, PointerNetLSTMCell
+        inputs: the input sequence to rnn, fake_inputs = tf.zeros([batch_size, 2, 1])
+        inputs_len: valid length, sequence_len
+        initial_state: initial_state of the cell, init_state = tc.rnn.LSTMStateTuple(pooled_question_rep, pooled_question_rep)
     Returns:
         outputs and state
     """
     batch_size = tf.shape(inputs)[0]
-    max_time = tf.shape(inputs)[1]
+    max_time = tf.shape(inputs)[1] # 2
 
-    inputs_ta = tf.TensorArray(dtype=tf.float32, size=max_time)
-    inputs_ta = inputs_ta.unstack(tf.transpose(inputs, [1, 0, 2]))
+    inputs_ta = tf.TensorArray(dtype=tf.float32, size=max_time) # [2 step]
+    inputs_ta = inputs_ta.unstack(tf.transpose(inputs, [1, 0, 2])) # [2 step, batch_size, 1]
     emit_ta = tf.TensorArray(dtype=tf.float32, dynamic_size=True, size=0)
-    t0 = tf.constant(0, dtype=tf.int32)
+    t0 = tf.constant(0, dtype=tf.int32) # this is time steps?
     if initial_state is not None:
         s0 = initial_state
     else:
         s0 = cell.zero_state(batch_size, dtype=tf.float32)
-    f0 = tf.zeros([batch_size], dtype=tf.bool)
+    f0 = tf.zeros([batch_size], dtype=tf.bool) # is all finished
 
     def loop_fn(t, prev_s, emit_ta, finished):
         """
@@ -87,21 +87,26 @@ def attend_pooling(pooling_vectors, ref_vector, hidden_size, scope=None):
     """
     Applies attend pooling to a set of vectors according to a reference vector.
     Args:
-        pooling_vectors: the vectors to pool
-        ref_vector: the reference vector
+        pooling_vectors: the vectors to pool [batch_size, sequence_length, hidden_size*2]
+        ref_vector: the reference vector [1, self.hidden_size]
         hidden_size: the hidden size for attention function
         scope: score name
     Returns:
         the pooled vector
     """
     with tf.variable_scope(scope or 'attend_pooling'):
+        # [batch_size, sequence_length, hidden_size]
         U = tf.tanh(tc.layers.fully_connected(pooling_vectors, num_outputs=hidden_size,
                                               activation_fn=None, biases_initializer=None)
+                    # [1, 1, hidden_size]
                     + tc.layers.fully_connected(tf.expand_dims(ref_vector, 1),
                                                 num_outputs=hidden_size,
                                                 activation_fn=None))
+        # [bvatch_size, sequence_length, 1]
         logits = tc.layers.fully_connected(U, num_outputs=1, activation_fn=None)
         scores = tf.nn.softmax(logits, 1)
+        # pooling_vectors * scores = [batch_size, sequence_length, 2*hidden_size]
+        # pooled_vector = [batch_size, 2*hidden_size]
         pooled_vector = tf.reduce_sum(pooling_vectors * scores, axis=1)
     return pooled_vector
 
@@ -165,7 +170,7 @@ class PointerNetDecoder(object):
                                                  trainable=True, name="random_attn_vector")
                 # pooled_question_rep = [batch_size, hidden_size]
                 pooled_question_rep = tc.layers.fully_connected(
-                    # attend_pooling [batch_size, hidden_size]
+                    # attend_pooling [batch_size, 2*hidden_size]
                     attend_pooling(question_vectors, random_attn_vector, self.hidden_size),
                     num_outputs=self.hidden_size, activation_fn=None
                 )

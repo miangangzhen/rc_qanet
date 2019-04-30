@@ -89,9 +89,15 @@ class AttentionFlowMatchLayer(object):
         Match the passage_encodes with question_encodes using Attention Flow Match algorithm
         """
         with tf.variable_scope('bidaf'):
+            # sim_matrix = [batch_size * num_p, p_len, q_len]
             sim_matrix = tf.matmul(passage_encodes, question_encodes, transpose_b=True)
+            # context2question_attn = [batch_size * num_p, p_len, hidden_size*2]
             context2question_attn = tf.matmul(tf.nn.softmax(sim_matrix, -1), question_encodes)
+            # tf.reduce_max(sim_matrix, 2) = [batch_size * num_p, q_len]
+            # tf.expand_dims(xxx) = [batch_size * num_p, 1, q_len]
             b = tf.nn.softmax(tf.expand_dims(tf.reduce_max(sim_matrix, 2), 1), -1)
+            # tf.matmul(b, passage_encodes) = [batch_size * num_p, 1, hidden_size*2]
+            # tf.tile(xxx) = [batch_size * num_p, p_len, hidden_size*2]
             question2context_attn = tf.tile(tf.matmul(b, passage_encodes),
                                          [1, tf.shape(passage_encodes)[1], 1])
             concat_outputs = tf.concat([passage_encodes, context2question_attn,
