@@ -250,7 +250,7 @@ class RCModel(object):
             raise NotImplementedError('Unsupported optimizer: {}'.format(self.optim_type))
         self.train_op = self.optimizer.minimize(self.loss, global_step=self.global_step)
 
-    def _train_epoch(self, train_batches, dropout_keep_prob, data, batch_size, pad_id):
+    def _train_epoch(self, train_batches, dropout_keep_prob, data, batch_size, pad_id, max_rouge=0.0):
         """
         Trains the model for a single epoch.
         Args:
@@ -259,7 +259,7 @@ class RCModel(object):
         """
         total_num, total_loss = 0, 0
         log_every_n_batch, n_batch_loss = 250, 0
-        max_rouge = 0
+
         for bitx, batch in enumerate(train_batches, 1):
             # joint_learning step 4.
             batch = process_feed_dict(batch)
@@ -294,8 +294,7 @@ class RCModel(object):
                         self.save(self.model_dir, self.algo)
                         max_rouge = bleu_rouge['Rouge-L']
 
-
-        return 1.0 * total_loss / total_num
+        return 1.0 * total_loss / total_num, max_rouge
 
     def train(self, data, epochs, batch_size, save_dir, save_prefix,
               dropout_keep_prob=1.0, evaluate=True):
@@ -311,11 +310,11 @@ class RCModel(object):
             evaluate: whether to evaluate the model on test set after each epoch
         """
         pad_id = self.vocab.get_id(self.vocab.pad_token)
-        max_rouge = 0
+        max_rouge = 0.0
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches('train', batch_size, pad_id, shuffle=True)
-            train_loss = self._train_epoch(train_batches, dropout_keep_prob, data, batch_size, pad_id)
+            train_loss, max_rouge = self._train_epoch(train_batches, dropout_keep_prob, data, batch_size, pad_id, max_rouge=max_rouge)
             self.logger.info('Average train loss for epoch {} is {}'.format(epoch, train_loss))
 
             if evaluate:
