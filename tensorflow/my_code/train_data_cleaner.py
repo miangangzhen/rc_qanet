@@ -132,6 +132,5 @@ class DataClean(BRCDataset):
 
 if __name__ == "__main__":
     brc_data = DataClean(5, 500, 60,
-                          # ["../data/train_preprocessed/trainset/search.train.json", "../data/train_preprocessed/trainset/zhidao.train.json"],
-                         ["../data/train_preprocessed/trainset/search.train.json_pe"],
+                         ["../data/train_preprocessed/trainset/search.train.json_pe", "../data/train_preprocessed/trainset/zhidao.train.json_pe"],
                          [], [], limit=None)
