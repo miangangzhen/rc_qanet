@@ -81,6 +81,7 @@ class RCModel(object):
 
         # checkpoint dir
         self.checkpoint_dir = args.checkpoint_dir
+        self.model_dir = args.model_dir
 
     def _build_graph(self):
         """
@@ -258,6 +259,7 @@ class RCModel(object):
         """
         total_num, total_loss = 0, 0
         log_every_n_batch, n_batch_loss = 250, 0
+        max_rouge = 0
         for bitx, batch in enumerate(train_batches, 1):
             # joint_learning step 4.
             batch = process_feed_dict(batch)
@@ -288,6 +290,10 @@ class RCModel(object):
                     self.logger.info('Dev eval loss {}'.format(eval_loss))
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
 
+                    if bleu_rouge['Rouge-L'] > max_rouge:
+                        self.save(self.model_dir, self.algo)
+                        max_rouge = bleu_rouge['Rouge-L']
+
 
         return 1.0 * total_loss / total_num
 
@@ -305,7 +311,7 @@ class RCModel(object):
             evaluate: whether to evaluate the model on test set after each epoch
         """
         pad_id = self.vocab.get_id(self.vocab.pad_token)
-        max_bleu_4 = 0
+        max_rouge = 0
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches('train', batch_size, pad_id, shuffle=True)
@@ -320,9 +326,9 @@ class RCModel(object):
                     self.logger.info('Dev eval loss {}'.format(eval_loss))
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
 
-                    if bleu_rouge['Bleu-4'] > max_bleu_4:
+                    if bleu_rouge['Rouge-L'] > max_rouge:
                         self.save(save_dir, save_prefix)
-                        max_bleu_4 = bleu_rouge['Bleu-4']
+                        max_rouge = bleu_rouge['Rouge-L']
                 else:
                     self.logger.warning('No dev set is loaded for evaluation in the dataset!')
             else:

@@ -1,6 +1,8 @@
 import gensim
 import json
-
+"""
+预训练词向量
+"""
 
 class MySentences(object):
     def __init__(self, dirnames):

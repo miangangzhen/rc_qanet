@@ -5,7 +5,11 @@ import logging
 import tensorflow as tf
 import json
 import random
-
+"""
+清洗训练数据，以替代train_preprocessed/trainset/目录下的训练数据
+1.训练数据筛选
+2.数据增强: 原始数据num_passage=5，1真4假。这里改成了num_p=2，1真1假
+"""
 
 class DataClean(BRCDataset):
     def __init__(self, max_p_num, max_p_len, max_q_len,
@@ -129,5 +133,5 @@ class DataClean(BRCDataset):
 if __name__ == "__main__":
     brc_data = DataClean(5, 500, 60,
                           # ["../data/train_preprocessed/trainset/search.train.json", "../data/train_preprocessed/trainset/zhidao.train.json"],
-                         ["../data/train_preprocessed/trainset/zhidao.train.json"],
+                         ["../data/train_preprocessed/trainset/search.train.json_pe"],
                          [], [], limit=None)

@@ -8,6 +8,11 @@ import pickle
 import json
 from collections import Counter
 
+"""
+用这个程序替代官方run.py里的prepare方法。
+准备vocab文件，保存预训练的词向量
+"""
+
 
 class Param(collections.namedtuple("param",
                                    ["train_files","dev_files", "test_files",

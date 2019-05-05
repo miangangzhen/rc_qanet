@@ -12,7 +12,7 @@ from my_code.my_prepare import load_dataset, Param
 
 """
 官方给出的passage_max_len=500，太长了，非常容易爆显存
-分析一下数据集，看看有没有办法处理
+用这个程序看一下数据集分布，看看有没有办法处理
 """
 ROOT_PATH = "../data/"
 

@@ -2,7 +2,9 @@
 import json
 import time
 from collections import Counter
-
+"""
+用这个程序，看一下预测结果长什么样子
+"""
 
 def select_para(sample):
     results = []
