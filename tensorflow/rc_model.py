@@ -276,13 +276,13 @@ class RCModel(object):
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
             n_batch_loss += loss
+
             if log_every_n_batch > 0 and bitx % log_every_n_batch == 0:
                 self.logger.info('Average loss from batch {} to {} is {}, current step is {}'.format(
                     bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch, global_step))
                 n_batch_loss = 0
-                # save to checkpoint
-                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"), global_step=global_step)
-            if log_every_n_batch > 0 and bitx % (log_every_n_batch*4) == 0:
+
+            if log_every_n_batch > 0 and bitx % (log_every_n_batch*2) == 0:
                 self.logger.info('Evaluating the model after global_step {}'.format(global_step))
                 if data.dev_set is not None:
                     eval_batches = data.gen_mini_batches('dev', batch_size, pad_id, shuffle=False)
@@ -291,10 +291,11 @@ class RCModel(object):
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
 
                     if bleu_rouge['Rouge-L'] > max_rouge:
-                        self.save(self.model_dir, self.algo)
+                        self.logger.info("saving to checkpoint_dir at step: {}".format(global_step))
+                        self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"),
+                                        global_step=global_step)
                         max_rouge = bleu_rouge['Rouge-L']
-
-        return 1.0 * total_loss / total_num, max_rouge
+        return 1.0 * total_loss / total_num, max_rouge, global_step
 
     def train(self, data, epochs, batch_size, save_dir, save_prefix,
               dropout_keep_prob=1.0, evaluate=True):
@@ -314,7 +315,7 @@ class RCModel(object):
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches('train', batch_size, pad_id, shuffle=True)
-            train_loss, max_rouge = self._train_epoch(train_batches, dropout_keep_prob, data, batch_size, pad_id, max_rouge=max_rouge)
+            train_loss, max_rouge, global_step = self._train_epoch(train_batches, dropout_keep_prob, data, batch_size, pad_id, max_rouge=max_rouge)
             self.logger.info('Average train loss for epoch {} is {}'.format(epoch, train_loss))
 
             if evaluate:
@@ -326,12 +327,12 @@ class RCModel(object):
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
 
                     if bleu_rouge['Rouge-L'] > max_rouge:
-                        self.save(save_dir, save_prefix)
+                        self.logger.info("saving to checkpoint_dir at step: {}".format(global_step))
+                        self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"),
+                                        global_step=global_step)
                         max_rouge = bleu_rouge['Rouge-L']
-                else:
-                    self.logger.warning('No dev set is loaded for evaluation in the dataset!')
-            else:
-                self.save(save_dir, save_prefix + '_' + str(epoch))
+            # else:
+            #     self.save(save_dir, save_prefix + '_' + str(epoch))
 
     def evaluate(self, eval_batches, result_dir=None, result_prefix=None, save_full_info=False):
         """
