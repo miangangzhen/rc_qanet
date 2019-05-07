@@ -298,7 +298,7 @@ class RCModel(object):
         return 1.0 * total_loss / total_num, max_rouge, global_step
 
     def train(self, data, epochs, batch_size, save_dir, save_prefix,
-              dropout_keep_prob=1.0, evaluate=True):
+              dropout_keep_prob=1.0, evaluate=True, max_rouge=0.0):
         """
         Train the model with data
         Args:
@@ -311,7 +311,6 @@ class RCModel(object):
             evaluate: whether to evaluate the model on test set after each epoch
         """
         pad_id = self.vocab.get_id(self.vocab.pad_token)
-        max_rouge = 0.0
         for epoch in range(1, epochs + 1):
             self.logger.info('Training the model for epoch {}'.format(epoch))
             train_batches = data.gen_mini_batches('train', batch_size, pad_id, shuffle=True)

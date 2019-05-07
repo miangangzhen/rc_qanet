@@ -123,6 +123,7 @@ def parse_args():
                                 help='max norm grad')
     ###########################################################
     train_settings.add_argument("--limit", type=str, default=None, help="train data limit")
+    train_settings.add_argument("--max_rouge", type=float, default=0.0, help="best rouge score from previous training")
     return parser.parse_args()
 
 
@@ -210,7 +211,7 @@ def train(args):
     logger.info('Training the model...')
     rc_model.train(brc_data, args.epochs, args.batch_size, save_dir=args.model_dir,
                    save_prefix=args.algo,
-                   dropout_keep_prob=args.dropout_keep_prob, evaluate=True)
+                   dropout_keep_prob=args.dropout_keep_prob, evaluate=True, max_rouge=args.max_rouge)
     logger.info('Done with model training!')
 
 

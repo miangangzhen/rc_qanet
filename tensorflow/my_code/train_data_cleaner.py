@@ -25,16 +25,6 @@ class DataClean(BRCDataset):
             for train_file in tf.gfile.Glob(train_files):
                 self._transform_dataset(train_file, train=True, limit=limit)
             self.logger.info('Train set size: {} questions.'.format(len(self.train_set)))
-        #
-        # if dev_files:
-        #     for dev_file in tf.gfile.Glob(dev_files):
-        #         self.dev_set += self._load_dataset(dev_file)
-        #     self.logger.info('Dev set size: {} questions.'.format(len(self.dev_set)))
-        #
-        # if test_files:
-        #     for test_file in tf.gfile.Glob(test_files):
-        #         self.test_set += self._load_dataset(test_file)
-        #     self.logger.info('Test set size: {} questions.'.format(len(self.test_set)))
 
     def _transform_dataset(self, data_path, train=False, limit=None):
         """
@@ -58,9 +48,7 @@ class DataClean(BRCDataset):
                             skip_count += 1
                             continue
 
-                    # if "answer_spans" in sample.keys():
                     data["answer_spans"] = sample["answer_spans"]
-                    # if 'answer_docs' in sample:
                     data['answer_docs'] = sample['answer_docs']
                     if sample["answer_docs"][0] > (len(sample["documents"])-1):
                         print("answer doc not in documents")
@@ -101,12 +89,7 @@ class DataClean(BRCDataset):
                                 best_score = score
                         if best_score < 0.01:
                             skip_count += 1
-                            # print(data["answers"])
-                            # print("".join(data["documents"][data["answer_docs"][0]]["passage_tokens"][
-                            #                       data["answer_spans"][0][0]:data["answer_spans"][0][1] + 1]))
-                            # print("====")
                             continue
-                    ##########################################################
 
                     # 数据增强 ###############################################
                     # 删除训练中不需要的字段，减小训练文件大小
