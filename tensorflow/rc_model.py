@@ -128,7 +128,7 @@ class RCModel(object):
                 'word_embeddings',
                 shape=(self.vocab.size(), self.vocab.embed_dim),
                 initializer=tf.constant_initializer(self.vocab.embeddings),
-                trainable=True
+                trainable=False # True
             )
             # [batch_size*max_passage_num, sequence_length, embedding_size]
             self.p_emb = tf.nn.embedding_lookup(self.word_embeddings, self.p)
