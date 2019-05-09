@@ -75,6 +75,7 @@ class RCModel(object):
 
         # save info
         self.saver = tf.train.Saver()
+        self.best_model_saver = tf.train.Saver()
 
         # initialize the model
         self.sess.run(tf.global_variables_initializer())
@@ -280,6 +281,7 @@ class RCModel(object):
             if log_every_n_batch > 0 and bitx % log_every_n_batch == 0:
                 self.logger.info('Average loss from batch {} to {} is {}, current step is {}'.format(
                     bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch, global_step))
+
                 n_batch_loss = 0
 
             if log_every_n_batch > 0 and bitx % (log_every_n_batch*2) == 0:
@@ -291,10 +293,12 @@ class RCModel(object):
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
 
                     if bleu_rouge['Rouge-L'] > max_rouge:
-                        self.logger.info("saving to checkpoint_dir at step: {}".format(global_step))
-                        self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"),
+                        self.logger.info("saving best model to model_dir at step: {}".format(global_step))
+                        self.best_model_saver.save(self.sess, os.path.join(self.model_dir, "save_every_log_every_n_batch"),
                                         global_step=global_step)
                         max_rouge = bleu_rouge['Rouge-L']
+                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_epoch"),
+                                global_step=global_step)
         return 1.0 * total_loss / total_num, max_rouge, global_step
 
     def train(self, data, epochs, batch_size, save_dir, save_prefix,
@@ -326,12 +330,14 @@ class RCModel(object):
                     self.logger.info('Dev eval result: {}'.format(bleu_rouge))
 
                     if bleu_rouge['Rouge-L'] > max_rouge:
-                        self.logger.info("saving to checkpoint_dir at step: {}".format(global_step))
-                        self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_n_batch"),
+                        self.logger.info("saving best model to model_dir at step: {}".format(global_step))
+                        self.best_model_saver.save(self.sess, os.path.join(self.model_dir, "save_every_log_every_n_batch"),
                                         global_step=global_step)
                         max_rouge = bleu_rouge['Rouge-L']
             # else:
             #     self.save(save_dir, save_prefix + '_' + str(epoch))
+                self.saver.save(self.sess, os.path.join(self.checkpoint_dir, "save_every_log_every_epoch"),
+                            global_step=global_step)
 
     def evaluate(self, eval_batches, result_dir=None, result_prefix=None, save_full_info=False):
         """

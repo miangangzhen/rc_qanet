@@ -85,7 +85,7 @@ def parse_args():
 
     path_settings = parser.add_argument_group('path settings')
     path_settings.add_argument('--train_files', nargs='+',
-                               default=["../data/train_preprocessed/trainset/search.train.jsoncleaned"], #  ['../data/demo/trainset/search.train.json'],
+                               default=["../data/train_preprocessed/trainset/search.train.json_pecleaned"], #  ['../data/demo/trainset/search.train.json'],
                                help='list of files that contain the preprocessed train data')
     path_settings.add_argument('--dev_files', nargs='+',
                                default=["../data/dev_preprocessed/devset/search.dev.json", "../data/dev_preprocessed/devset/zhidao.dev.json"], #  ['../data/demo/devset/search.dev.json'],
@@ -177,7 +177,7 @@ def train(args):
     args.batch_size = 4
     args.hidden_size = 32
     args.head_size = 1
-    limit = [0, 2000]
+    limit = [0, 200]
     args.max_p_len = 400
 
     # run on gpu
@@ -202,7 +202,7 @@ def train(args):
     # rc_model = TransformerModel(vocab, args)
     # try load from check point
     if tf.gfile.Exists(args.checkpoint_dir):
-        rc_model.restore(model_dir=args.checkpoint_dir)
+        rc_model.restore(model_dir=args.model_dir)
     logger.info('Training the model...')
     rc_model.train(brc_data, args.epochs, args.batch_size, save_dir=args.model_dir,
                    save_prefix=args.algo,
@@ -214,6 +214,19 @@ def evaluate(args):
     """
     evaluate the trained model on dev files
     """
+
+    args.max_p_num = 5
+    # args.loss_type = "cross_entropy"
+    # args.loss_type = "sparse_nll_loss"
+    args.optim = "adam"
+    args.dropout_keep_prob = 1.0
+
+    # run on cpu
+    args.batch_size = 4
+    args.hidden_size = 32
+    args.head_size = 1
+    args.max_p_len = 400
+
     logger = logging.getLogger("brc")
     logger.info('Load data_set and vocab...')
     with open(os.path.join(args.vocab_dir, 'vocab.data'), 'rb') as fin:
@@ -262,7 +275,7 @@ def predict(args):
     brc_data.convert_to_ids(vocab)
     logger.info('Restoring the model...')
     rc_model = RCModel(vocab, args)
-    rc_model.restore(model_dir=args.checkpoint_dir)
+    rc_model.restore(model_dir=args.model_dir)
     logger.info('Predicting answers for test set...')
     test_batches = brc_data.gen_mini_batches('test', args.batch_size,
                                              pad_id=vocab.get_id(vocab.pad_token), shuffle=False)
