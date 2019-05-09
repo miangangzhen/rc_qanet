@@ -220,8 +220,17 @@ class RCModel(object):
                 losses = - tf.reduce_sum(labels * tf.log(probs + epsilon), 1)
             return losses
 
-        self.start_loss = sparse_nll_loss(probs=self.start_probs, labels=self.start_label)
-        self.end_loss = sparse_nll_loss(probs=self.end_probs, labels=self.end_label)
+        def cross_entropy_loss(probs, labels, scope=None):
+            with tf.name_scope(scope, "ce_loss"):
+                labels = tf.one_hot(labels, tf.shape(probs)[1], axis=1)
+                losses = tf.nn.softmax_cross_entropy_with_logits(
+                    logits=probs, labels=labels)
+            return losses
+
+        # self.start_loss = sparse_nll_loss(probs=self.start_probs, labels=self.start_label)
+        # self.end_loss = sparse_nll_loss(probs=self.end_probs, labels=self.end_label)
+        self.start_loss = cross_entropy_loss(probs=self.start_probs, labels=self.start_label)
+        self.end_loss = cross_entropy_loss(probs=self.end_probs, labels=self.end_label)
         self.all_params = tf.trainable_variables()
         self.rc_loss = tf.reduce_mean(tf.add(self.start_loss, self.end_loss))
 

@@ -58,13 +58,13 @@ def select_para(sample):
 def get_test_questions():
     questions = []
     paras_selecteds = []
-    with open("../data/test1_preprocessed/test1set/search.test1.json", "r", encoding="utf-8") as f:
+    with open("../data/test1_preprocessed/test1set/search.test1.json_pe", "r", encoding="utf-8") as f:
         for line in f.readlines():
             item = json.loads(line)
             paras_selected = select_para(item)
             paras_selecteds.append(paras_selected)
             questions.append(item["question"])
-    with open("../data/test1_preprocessed/test1set/zhidao.test1.json", "r", encoding="utf-8") as f:
+    with open("../data/test1_preprocessed/test1set/zhidao.test1.json_pe", "r", encoding="utf-8") as f:
         for line in f.readlines():
             item = json.loads(line)
             questions.append(item["question"])
@@ -82,7 +82,9 @@ def get_test_answer(path):
 
 if __name__ == "__main__":
     questions, paras_selecteds = get_test_questions()
-    answers = get_test_answer("results/w2v_bidaf_yesno_nump5_test.predicted.json")
+    path = "pe_vocabfalse_test"
+    # path = "pe_order_test"
+    answers = get_test_answer("results/{}.predicted.json".format(path))
 
     for question, answer, paras_selected in zip(questions, answers, paras_selecteds):
         print("question: ", question)
