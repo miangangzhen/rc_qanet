@@ -136,7 +136,7 @@ class RCModel(object):
             self.q_emb = tf.nn.embedding_lookup(self.word_embeddings, self.q)
             p_shape = tf.shape(self.p_emb)
             if self.use_dropout:
-                self.p_emb += tf.random.normal([p_shape[0], p_shape[1], p_shape[2]], mean=0.0, stddev=0.001)
+                self.p_emb += tf.random.normal([p_shape[0], p_shape[1], p_shape[2]], mean=0.0, stddev=0.0001)
 
     def _encode(self):
         """
