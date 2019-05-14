@@ -134,8 +134,9 @@ class RCModel(object):
             # [batch_size*max_passage_num, sequence_length, embedding_size]
             self.p_emb = tf.nn.embedding_lookup(self.word_embeddings, self.p)
             self.q_emb = tf.nn.embedding_lookup(self.word_embeddings, self.q)
-            p_shape = tf.shape(self.p_emb)
+
             # add noise to embedding that doesn't work
+            # p_shape = tf.shape(self.p_emb)
             # if self.use_dropout:
             #     self.p_emb += tf.random.normal([p_shape[0], p_shape[1], p_shape[2]], mean=0.0, stddev=0.0001)
 
@@ -299,7 +300,7 @@ class RCModel(object):
             n_classification_loss += classification_loss
             n_yes_no_answer_loss += yes_no_answer_loss
             n_rouge_loss += rouge_loss
-            # self.logger.info("loss {}, rc_loss {}, classification_loss {}, yes_no_answer_loss {}, rouge_loss {}".format(loss, rc_loss, classification_loss, yes_no_answer_loss, rouge_loss))
+            self.logger.info("loss {}, rc_loss {}, classification_loss {}, yes_no_answer_loss {}, rouge_loss {}".format(loss, rc_loss, classification_loss, yes_no_answer_loss, rouge_loss))
             if log_every_n_batch > 0 and bitx % log_every_n_batch == 0:
                 self.logger.info('Average loss from batch {} to {} is {}, current step is {}'.format(
                     bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch, global_step))
