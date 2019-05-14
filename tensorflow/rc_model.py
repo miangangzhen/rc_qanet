@@ -242,9 +242,9 @@ class RCModel(object):
         # joint_learning step 3.
         self.classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.q_type_logits, labels=self.question_type))
         self.yes_no_answer_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.yes_no_logits, labels=self.yes_no_answer))
-        self.rouge_loss = get_rouge_loss(self.p, self.start_probs, self.end_probs, self.start_label, self.end_label)
+        # self.rouge_loss = get_rouge_loss(self.p, self.start_probs, self.end_probs, self.start_label, self.end_label)
 
-        self.loss = self.rc_loss + self.classification_loss + self.yes_no_answer_loss + self.rouge_loss
+        self.loss = self.rc_loss + self.classification_loss + self.yes_no_answer_loss # + self.rouge_loss
 
         if self.weight_decay > 0:
             with tf.variable_scope('l2_loss'):
@@ -275,7 +275,7 @@ class RCModel(object):
             dropout_keep_prob: float value indicating dropout keep probability
         """
         total_num, total_loss = 0, 0
-        n_rc_loss, n_classification_loss, n_yes_no_answer_loss, n_rouge_loss = 0, 0, 0, 0
+        # n_rc_loss, n_classification_loss, n_yes_no_answer_loss, n_rouge_loss = 0, 0, 0, 0
         log_every_n_batch, n_batch_loss = 250, 0
 
         for bitx, batch in enumerate(train_batches, 1):
@@ -290,28 +290,28 @@ class RCModel(object):
                          self.dropout_keep_prob: dropout_keep_prob,
                          self.question_type: batch["question_type"],
                          self.yes_no_answer: batch["yes_no_answer"]}
-            # _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
-            _, loss, global_step, rc_loss, classification_loss, yes_no_answer_loss, rouge_loss = \
-                self.sess.run([self.train_op, self.loss, self.global_step, self.rc_loss, self.classification_loss, self.yes_no_answer_loss, self.rouge_loss], feed_dict)
+            _, loss, global_step = self.sess.run([self.train_op, self.loss, self.global_step], feed_dict)
+            # _, loss, global_step, rc_loss, classification_loss, yes_no_answer_loss, rouge_loss = \
+            #     self.sess.run([self.train_op, self.loss, self.global_step, self.rc_loss, self.classification_loss, self.yes_no_answer_loss, self.rouge_loss], feed_dict)
             total_loss += loss * len(batch['raw_data'])
             total_num += len(batch['raw_data'])
             n_batch_loss += loss
-            n_rc_loss += rc_loss
-            n_classification_loss += classification_loss
-            n_yes_no_answer_loss += yes_no_answer_loss
-            n_rouge_loss += rouge_loss
-            self.logger.info("loss {}, rc_loss {}, classification_loss {}, yes_no_answer_loss {}, rouge_loss {}".format(loss, rc_loss, classification_loss, yes_no_answer_loss, rouge_loss))
+            # n_rc_loss += rc_loss
+            # n_classification_loss += classification_loss
+            # n_yes_no_answer_loss += yes_no_answer_loss
+            # n_rouge_loss += rouge_loss
+            # self.logger.info("loss {}, rc_loss {}, classification_loss {}, yes_no_answer_loss {}, rouge_loss {}".format(loss, rc_loss, classification_loss, yes_no_answer_loss, rouge_loss))
             if log_every_n_batch > 0 and bitx % log_every_n_batch == 0:
                 self.logger.info('Average loss from batch {} to {} is {}, current step is {}'.format(
                     bitx - log_every_n_batch + 1, bitx, n_batch_loss / log_every_n_batch, global_step))
-                self.logger.info("rc_loss {}, classification_loss {}, yes_no_answer_loss {}, rouge_loss {}".format(
-                    n_rc_loss/log_every_n_batch,
-                    n_classification_loss/log_every_n_batch,
-                    n_yes_no_answer_loss/log_every_n_batch,
-                    n_rouge_loss/log_every_n_batch
-                ))
+                # self.logger.info("rc_loss {}, classification_loss {}, yes_no_answer_loss {}, rouge_loss {}".format(
+                #     n_rc_loss/log_every_n_batch,
+                #     n_classification_loss/log_every_n_batch,
+                #     n_yes_no_answer_loss/log_every_n_batch,
+                #     n_rouge_loss/log_every_n_batch
+                # ))
                 n_batch_loss = 0
-                n_rc_loss, n_classification_loss, n_yes_no_answer_loss, n_rouge_loss = 0, 0, 0, 0
+                # n_rc_loss, n_classification_loss, n_yes_no_answer_loss, n_rouge_loss = 0, 0, 0, 0
 
             if log_every_n_batch > 0 and bitx % (log_every_n_batch*2) == 0:
                 self.logger.info('Evaluating the model after global_step {}'.format(global_step))
