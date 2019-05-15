@@ -136,9 +136,9 @@ class RCModel(object):
             self.q_emb = tf.nn.embedding_lookup(self.word_embeddings, self.q)
 
             # add noise to embedding that doesn't work
-            # p_shape = tf.shape(self.p_emb)
-            # if self.use_dropout:
-            #     self.p_emb += tf.random.normal([p_shape[0], p_shape[1], p_shape[2]], mean=0.0, stddev=0.0001)
+            p_shape = tf.shape(self.p_emb)
+            if self.use_dropout:
+                self.p_emb += tf.random.normal([p_shape[0], p_shape[1], p_shape[2]], mean=0.0, stddev=0.0001)
 
     def _encode(self):
         """
@@ -232,10 +232,10 @@ class RCModel(object):
                     logits=probs, labels=labels)
             return losses
 
-        # self.start_loss = sparse_nll_loss(probs=self.start_probs, labels=self.start_label)
-        # self.end_loss = sparse_nll_loss(probs=self.end_probs, labels=self.end_label)
-        self.start_loss = cross_entropy_loss(probs=self.start_probs, labels=self.start_label)
-        self.end_loss = cross_entropy_loss(probs=self.end_probs, labels=self.end_label)
+        self.start_loss = sparse_nll_loss(probs=self.start_probs, labels=self.start_label)
+        self.end_loss = sparse_nll_loss(probs=self.end_probs, labels=self.end_label)
+        # self.start_loss = cross_entropy_loss(probs=self.start_probs, labels=self.start_label)
+        # self.end_loss = cross_entropy_loss(probs=self.end_probs, labels=self.end_label)
         self.all_params = tf.trainable_variables()
         self.rc_loss = tf.reduce_mean(tf.add(self.start_loss, self.end_loss))
 
