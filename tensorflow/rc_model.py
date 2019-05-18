@@ -313,7 +313,8 @@ class RCModel(object):
                 n_batch_loss = 0
                 # n_rc_loss, n_classification_loss, n_yes_no_answer_loss, n_rouge_loss = 0, 0, 0, 0
 
-            if log_every_n_batch > 0 and bitx % (log_every_n_batch*2) == 0:
+            # eval every log_every_n_batch times
+            # if log_every_n_batch > 0 and bitx % (log_every_n_batch*2) == 0:
                 self.logger.info('Evaluating the model after global_step {}'.format(global_step))
                 if data.dev_set is not None:
                     eval_batches = data.gen_mini_batches('dev', batch_size, pad_id, shuffle=False)
